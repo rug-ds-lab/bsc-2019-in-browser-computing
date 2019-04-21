@@ -13,6 +13,7 @@ The code already comes with an example Fibonacci load function.
         id: 1,      //The client ID,
         load: {},   //The new load from the stepFunction
     }
+    ```
     The `load` contains the same dataType as the return type of the stepFunction. For example if he stepFunction is returning 
     ```
     {
