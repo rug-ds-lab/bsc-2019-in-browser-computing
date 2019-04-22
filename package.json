@@ -7,6 +7,6 @@
     "client": "node Client.js"
   },
   "author": "George Argyrousis & Tolga Parlan",
-  "license": "ISC",
+  "license": "MIT Groningen",
   "homepage": "https://github.com/GeorgeArgyrousis/ThesisProject#readme"
 }
