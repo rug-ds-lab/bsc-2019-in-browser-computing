@@ -1,0 +1,12 @@
+{
+  "name": "Pegasus",
+  "version": "0.0.1",
+  "description": "Distributed Browser computing framework",
+  "scripts": {
+    "server": "node Server.js",
+    "client": "node Client.js"
+  },
+  "author": "George Argyrousis & Tolga Parlan",
+  "license": "ISC",
+  "homepage": "https://github.com/GeorgeArgyrousis/ThesisProject#readme"
+}
