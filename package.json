@@ -8,5 +8,9 @@
   },
   "author": "George Argyrousis & Tolga Parlan",
   "license": "MIT Groningen",
-  "homepage": "https://github.com/GeorgeArgyrousis/ThesisProject#readme"
+  "homepage": "https://github.com/rug-ds-lab/bsc-2019-in-browser-computing",
+  "dependencies": {
+    "express": "^4.16.4",
+    "socket.io": "^2.2.0"
+  }
 }
