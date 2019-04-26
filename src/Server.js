@@ -2,7 +2,9 @@
 
 const express = require('express'),
     socketio = require('socket.io'),
-    util = require('./util.js');
+    util = require('./util.js'),
+    ClientManager = require('./ClientManager.js'),
+    async = require('async');
  
 class Server {
 
@@ -17,12 +19,14 @@ class Server {
      *        with f(callback). The function should return more (and distinct) data at each calling
      *        by evoking callback(err, data). If a truity err is passed, it's interpreted as the end
      *        of the data stream.
+     * @param {Number} [opt.jobSize=20] Pieces of data to send in each individual batch of job to the clients
      * @param {Number} [opt.reconnectInterval=5000] The time (in ms) to wait before trying to reconnect to a client.
      */
     constructor(opt) {
         this.debug = opt.debug || false; 
         this.port = opt.port || 80;
         this.reconnectInterval = opt.reconnectInterval || 5000;
+        this.jobSize = opt.jobSize || 20;
 
         if(!opt.data){
             throw new Error("Data Option is mandatory.");
@@ -37,6 +41,19 @@ class Server {
         }
 
         this.data = opt.data;
+
+        /**
+         * Keeps track of data sent to a client, but not received back yet
+         * TODO: Implement this so that the disconnected clients don't cause data loss
+         */
+        this.buffer = {};
+
+        /**
+         * Keeps count of the data already fetched and sent to users
+         */
+        this.fetchedCount = 0; 
+
+        this.clientManager = new ClientManager();
     }
 
     /**
@@ -49,24 +66,51 @@ class Server {
 
         const io = socketio.listen(server);
         io.on('connection', this._handleConnection.bind(this));
+
+        this._sendJobs();
     }
 
-    //TODO: EVERYTHING BELOW STILL NEEDS REAL IMPLEMENTATIONS
+    _sendJobs(){
+        async.forever(this._sendJob.bind(this), (err) => {
+            // TODO: Somehow hand the control back to the user program here 
+            console.log(err);
+        });
+    }
+
+    _sendJob(callback){
+        const that = this;
+
+        // get a free client and data to be sent
+        async.parallel({
+            client: this.clientManager.getFreeClient.bind(this.clientManager),
+            data: this._getData.bind(this, this.jobSize)
+        }, (err, results) => {
+            if(err){
+                return callback(err);
+            }
+
+            results.client.emit("data", results.data);
+            that.fetchedCount+=results.data.length;
+
+            results.client.once("result", that._handleResult.bind(that, results.client));
+            return callback(null);
+        });
+    }
 
     /**
+     * Handler for a new client connecting. 
      * 
      * @param {Socket} socket See https://socket.io/docs/server-api/#Socket
      */
     _handleConnection(socket){
         util.debug(this.debug, "A user has connected");
-        this._getData(1, (err, data) => {
-            socket.emit('data', data);
-        });
-        socket.on('result', this._handleResult.bind(this));
+        this.clientManager.addClient.call(this.clientManager, socket);
     }
 
-    _handleResult(result){
+    _handleResult(client, result){
+        // TODO: Actually do something with the processed data 
         util.debug(this.debug, `Received result: ${result}`);
+        this.clientManager.setClientFree(client);
     }
 
     /**
@@ -87,17 +131,40 @@ class Server {
         }
     }
 
-    // TODO: Actually implement these functions
+    /**
+     * Refer to _getData.
+     */
     _getArrayData(count, callback){
-        return callback(null, this.data[0]);
+        const data = this.data.slice(this.fetchedCount, this.fetchedCount + count);
+        if(!data.length){
+            return callback(new Error("No more data"));
+        }
+        return callback(null, data);
     }
 
+    /**
+     * Refer to _getData.
+     */
     _getObjectData(count, callback){
+        const keys = Object.keys(this.data).slice(this.fetchedCount, this.fetchedCount + count);
 
+        // no more data left
+        if(!keys.length){
+            return callback(new Error("No more data"));
+        }
+
+        let data = [];
+        keys.forEach((key) => {
+            data.push(this.data[key]);
+        });
+        return callback(null, data);
     }
 
+    /**
+     * Refer to _getData.
+     */
     _getFunctionData(count, callback){
-
+        
     }
 }
 

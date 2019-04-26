@@ -1,7 +1,7 @@
 const distServer = require('../../src/DistributedSystem').Server;
 
-// array of numbers [0..500]
-const data = Array.from(new Array(500), (x,i) => i); 
+// array of numbers [0..100000]
+const data = Array.from(new Array(100000), (x,i) => i); 
 
 const s = new distServer({
     port:3000,
