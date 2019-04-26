@@ -1,6 +1,7 @@
 'use strict';
 
-const io = require('socket.io-client');
+const io = require('socket.io-client'),
+    util = require('./util.js');
 
 class Client {
 
@@ -39,15 +40,11 @@ class Client {
         const socket = io.connect("http://localhost:3000");
 
         socket.on('connect', function(){
-            if(that.debug){
-                console.log("Connected to the host");
-            }
+            util.debug(that.debug, "Connected to the host");
         });
 
         socket.on('data', (data) => {
-            if(that.debug){
-                console.log(`Received data from the host: ${data}`);
-            }
+            util.debug(that.debug, `Received data from the host: ${data}`);
             that.workFunction(data, (result) => {
                 socket.emit('result', result);
                 console.log(`Send result to the host: ${result}`);

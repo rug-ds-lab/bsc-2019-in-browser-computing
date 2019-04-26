@@ -1,7 +1,8 @@
 'use strict';
 
 const express = require('express'),
-    socketio = require('socket.io');
+    socketio = require('socket.io'),
+    util = require('./util.js');
  
 class Server {
 
@@ -44,9 +45,7 @@ class Server {
     startServer(){
         const server = express().listen(this.port);
 
-        if(this.debug){
-            console.log(`Server listening on port ${this.port}`);
-        }
+        util.debug(this.debug, `Server listening on port ${this.port}`);
 
         const io = socketio.listen(server);
         io.on('connection', this._handleConnection.bind(this));
@@ -59,9 +58,7 @@ class Server {
      * @param {Socket} socket See https://socket.io/docs/server-api/#Socket
      */
     _handleConnection(socket){
-        if(this.debug){
-            console.log("A user has connected");
-        }
+        util.debug(this.debug, "A user has connected");
         this._getData(1, (err, data) => {
             socket.emit('data', data);
         });
@@ -69,9 +66,7 @@ class Server {
     }
 
     _handleResult(result){
-        if(this.debug){
-            console.log(`Received result: ${result}`);
-        }
+        util.debug(this.debug, `Received result: ${result}`);
     }
 
     /**
