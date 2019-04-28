@@ -53,30 +53,59 @@ class Server {
          */
         this.fetchedCount = 0; 
 
+        this.dataHasEnded = false;
+        this.io = null;
+
         this.clientManager = new ClientManager();
     }
 
     /**
-     * Start the server with the specified port.
+     * Starts the server with the specified port, which then starts distributing the 
+     * jobs between the clients as they connect.
+     * 
+     * @param {Function} callback Callback to invoke after all the data is processed.
+     *                   Invoked with callback(err) with err being null if everything
+     *                   went alright.
      */
-    startServer(){
+    startJobs(callback){
         const server = express().listen(this.port);
 
         util.debug(this.debug, `Server listening on port ${this.port}`);
 
-        const io = socketio.listen(server);
-        io.on('connection', this._handleConnection.bind(this));
+        this.io = socketio.listen(server);
+        this.io.on('connection', this._handleConnection.bind(this));
 
-        this._sendJobs();
+        this._sendJobs(callback);
     }
 
-    _sendJobs(){
+    /**
+     * Invoke the _sendJobs function in an infinite loop until error or End of Data.
+     * 
+     * @param {Function} callback Callback to invoke after all the data is processed.
+     *                   Invoked with callback(err) with err being null if everything
+     *                   went alright.
+     */
+    _sendJobs(callback){
+        const that = this;
+
         async.forever(this._sendJob.bind(this), (err) => {
-            // TODO: Somehow hand the control back to the user program here 
-            console.log(err);
+            that.io.close();
+
+            if(err.message === "End of Data"){
+                return callback(null);
+            }
+
+            return callback(err);
         });
     }
 
+    /**
+     * Fetches data from the data source and a free client, sends that data to that client.
+     * When the data processing is done, _handleResult is invoked with the results.
+     * 
+     * @param {Function} callback Invoked after the data is sent (but independently of whether
+     *                            the result is actually collected) or after an error. 
+     */
     _sendJob(callback){
         const that = this;
 
@@ -121,6 +150,10 @@ class Server {
      *                   the data function returned an error, the err parameter is truthy. 
      */
     _getData(count, callback){
+        if(this.dataHasEnded){
+            return callback(new Error("End of Data"));
+        }
+
         switch(this.dataType){
             case "array":
                 return this._getArrayData(count, callback);
@@ -136,9 +169,11 @@ class Server {
      */
     _getArrayData(count, callback){
         const data = this.data.slice(this.fetchedCount, this.fetchedCount + count);
-        if(!data.length){
-            return callback(new Error("No more data"));
+
+        if(data.length < count){
+            this.dataHasEnded = true;
         }
+
         return callback(null, data);
     }
 
@@ -148,15 +183,16 @@ class Server {
     _getObjectData(count, callback){
         const keys = Object.keys(this.data).slice(this.fetchedCount, this.fetchedCount + count);
 
-        // no more data left
-        if(!keys.length){
-            return callback(new Error("No more data"));
-        }
-
         let data = [];
         keys.forEach((key) => {
             data.push(this.data[key]);
         });
+
+        // No more data left after this
+        if(data.length < count){
+            this.dataHasEnded = true;
+        }
+
         return callback(null, data);
     }
 
@@ -164,7 +200,30 @@ class Server {
      * Refer to _getData.
      */
     _getFunctionData(count, callback){
-        
+        const that = this;
+
+        let returnData = [];
+
+        // This wrapping is needed because the async.times calls the iterate function with (number, callback)
+        // But this number would be irrelevant for the user provided function.
+        const wrappedDataFunction = (_n, callback) => {
+            that.data((err, data) => {
+                if(err){
+                    return callback(err);
+                }
+
+                returnData.push(data);
+                return callback(null);
+            });
+        };
+
+        async.times(count, wrappedDataFunction, (err) => {
+            if(err){
+                that.dataHasEnded = true;
+            }
+
+            return callback(null, returnData);
+        });
     }
 }
 

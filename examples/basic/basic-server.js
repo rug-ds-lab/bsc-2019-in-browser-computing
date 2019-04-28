@@ -1,7 +1,13 @@
 const distServer = require('../../src/DistributedSystem').Server;
 
-// array of numbers [0..100000]
-const data = Array.from(new Array(100000), (x,i) => i); 
+let i = 0;
+const data = (callback) => {
+  i++;
+  if(i > 1000000){
+    return callback(new Error("End of data"));
+  }
+  return callback(null, i);
+};
 
 const s = new distServer({
     port:3000,
@@ -9,4 +15,6 @@ const s = new distServer({
     data
   });
 
-s.startServer();
+s.startJobs((err) => {
+  console.log(err || "Jobs finished");
+});
