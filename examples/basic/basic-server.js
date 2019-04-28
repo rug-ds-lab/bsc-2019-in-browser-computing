@@ -15,6 +15,6 @@ const s = new distServer({
     data
   });
 
-s.startJobs((err) => {
-  console.log(err || "Jobs finished");
+s.startJobs((err, data) => {
+  console.log(err || data);
 });

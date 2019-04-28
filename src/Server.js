@@ -14,7 +14,7 @@ class Server {
      * @param {Number} [opt.port=80] The Server port.
      * @param {Boolean} [opt.debug=false] Debug mode
      * @param {Object|Array|Function} opt.data The data that is to be sent to the clients
-     *        for processing. If this is an array or an object, each key/index is simply distributed
+     *        for processing. If this is an array, each key/index is simply distributed
      *        amongst the clients. If a function is passed, the function is called continously 
      *        with f(callback). The function should return more (and distinct) data at each calling
      *        by evoking callback(err, data). If a truity err is passed, it's interpreted as the end
@@ -32,12 +32,10 @@ class Server {
             throw new Error("Data Option is mandatory.");
         } else if(Array.isArray(opt.data)){
             this.dataType = "array";
-        } else if(typeof opt.data === "object"){
-            this.dataType = "object";
         } else if(typeof opt.data === "function"){
             this.dataType = "function";
         } else {
-            throw new Error("Data needs to be an Array, Object or Function.");
+            throw new Error("Data needs to be an Array or Function.");
         }
 
         this.data = opt.data;
@@ -49,12 +47,26 @@ class Server {
         this.buffer = {};
 
         /**
-         * Keeps count of the data already fetched and sent to users
+         * Count of the fetched data
          */
         this.fetchedCount = 0; 
+        this.allDataHasBeenFetched = false;
 
-        this.dataHasEnded = false;
-        this.io = null;
+        /**
+         * Count of data groups sent to clients
+         */
+        this.sentCount = 0;
+        this.allDataHasBeenSent = false;
+
+        /**
+         * Count of data groups returned by clients
+         */
+        this.returnedCount = 0;
+
+        /**
+         * An intermediary collection of the data returned from the clients
+         */
+        this.returnedData = {};
 
         this.clientManager = new ClientManager();
     }
@@ -75,27 +87,29 @@ class Server {
         this.io = socketio.listen(server);
         this.io.on('connection', this._handleConnection.bind(this));
 
-        this._sendJobs(callback);
+        this._sendJobs();
+        this.callback = callback;
+    }
+
+    _collectData(){
+        let res = [];
+
+        for(let i=0;i<this.returnedCount;i++){
+            this.returnedData[i].forEach((j) => {
+                res.push(j);
+            });
+        }
+        
+        return res;
     }
 
     /**
-     * Invoke the _sendJobs function in an infinite loop until error or End of Data.
-     * 
-     * @param {Function} callback Callback to invoke after all the data is processed.
-     *                   Invoked with callback(err) with err being null if everything
-     *                   went alright.
+     * Invoke the _sendJobs function in an infinite loop until end of the data.
      */
-    _sendJobs(callback){
-        const that = this;
-
+    _sendJobs(){
         async.forever(this._sendJob.bind(this), (err) => {
-            that.io.close();
-
-            if(err.message === "End of Data"){
-                return callback(null);
-            }
-
-            return callback(err);
+            this.io.close();
+            this.allDataHasBeenSent = true;
         });
     }
 
@@ -112,16 +126,17 @@ class Server {
         // get a free client and data to be sent
         async.parallel({
             client: this.clientManager.getFreeClient.bind(this.clientManager),
-            data: this._getData.bind(this, this.jobSize)
+            data: this._fetchData.bind(this, this.jobSize)
         }, (err, results) => {
             if(err){
                 return callback(err);
             }
 
             results.client.emit("data", results.data);
-            that.fetchedCount+=results.data.length;
+            that.sentCount++;
 
-            results.client.once("result", that._handleResult.bind(that, results.client));
+            results.client.once("result", that._handleResult.bind(that, results.client, that.sentCount));
+
             return callback(null);
         });
     }
@@ -136,10 +151,22 @@ class Server {
         this.clientManager.addClient.call(this.clientManager, socket);
     }
 
-    _handleResult(client, result){
-        // TODO: Actually do something with the processed data 
+    /**
+     * Handler for a client returning a result
+     * 
+     * @param {Socket} client See https://socket.io/docs/server-api/#Socket
+     * @param {Array} result Result returned by the client
+     * @param {Number} count
+     */
+    _handleResult(client, count, result){
         util.debug(this.debug, `Received result: ${result}`);
         this.clientManager.setClientFree(client);
+        this.returnedData[count-1] = result;
+        this.returnedCount++;
+
+        if(this.allDataHasBeenSent && this.returnedCount === count){
+            this.callback(null, this._collectData());
+        }
     }
 
     /**
@@ -149,57 +176,37 @@ class Server {
      *                   (maximum) size "count". In case the end of the data is reached, or 
      *                   the data function returned an error, the err parameter is truthy. 
      */
-    _getData(count, callback){
-        if(this.dataHasEnded){
+    _fetchData(count, callback){
+        if(this.allDataHasBeenFetched){
             return callback(new Error("End of Data"));
         }
 
         switch(this.dataType){
             case "array":
-                return this._getArrayData(count, callback);
-            case "object":
-                return this._getObjectData(count, callback);
+                return this._fetchArrayData(count, callback);
             case "function":
-                return this._getFunctionData(count, callback);
+                return this._fetchFunctionData(count, callback);
         }
     }
 
     /**
-     * Refer to _getData.
+     * Refer to _fetchData.
      */
-    _getArrayData(count, callback){
+    _fetchArrayData(count, callback){
         const data = this.data.slice(this.fetchedCount, this.fetchedCount + count);
 
         if(data.length < count){
-            this.dataHasEnded = true;
+            this.allDataHasBeenFetched = true;
         }
 
+        this.fetchedCount+=data.length;
         return callback(null, data);
     }
 
     /**
-     * Refer to _getData.
+     * Refer to _fetchData.
      */
-    _getObjectData(count, callback){
-        const keys = Object.keys(this.data).slice(this.fetchedCount, this.fetchedCount + count);
-
-        let data = [];
-        keys.forEach((key) => {
-            data.push(this.data[key]);
-        });
-
-        // No more data left after this
-        if(data.length < count){
-            this.dataHasEnded = true;
-        }
-
-        return callback(null, data);
-    }
-
-    /**
-     * Refer to _getData.
-     */
-    _getFunctionData(count, callback){
+    _fetchFunctionData(count, callback){
         const that = this;
 
         let returnData = [];
@@ -219,9 +226,10 @@ class Server {
 
         async.times(count, wrappedDataFunction, (err) => {
             if(err){
-                that.dataHasEnded = true;
+                that.allDataHasBeenFetched = true;
             }
 
+            that.fetchedCount += returnData.length;
             return callback(null, returnData);
         });
     }
