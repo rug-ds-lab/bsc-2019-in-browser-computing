@@ -46,14 +46,14 @@ class Client {
 
         // Run the work function whenever data is received
         socket.on('data', (data) => {
-            util.debug(that.debug, `Received data from the host: ${data}`);
+            util.debug(that.debug, `Received data from the host: ${JSON.stringify(data)}`);
             async.map(data, that.workFunction, (err, result) => {
                 if(err){
                     throw err;
                 }
 
                 socket.emit('result', result);
-                util.debug(that.debug, `Send result to the host: ${result}`);
+                util.debug(that.debug, `Send result to the host: ${JSON.stringify(result)}`);
             });
         });
     }
