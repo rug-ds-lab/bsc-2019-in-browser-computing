@@ -17,7 +17,7 @@ class Server {
      *        for processing. If this is an array, each key/index is simply distributed
      *        amongst the clients. If a function is passed, the function is called continously 
      *        with f(callback). The function should return more (and distinct) data at each calling
-     *        by evoking callback(err, data). If a truity err is passed, it's interpreted as the end
+     *        by evoking callback(err, data). If a truthy err is passed, it's interpreted as the end
      *        of the data stream.
      * @param {Number} [opt.jobSize=20] Pieces of data to send in each individual batch of job to the clients
      * @param {Number} [opt.reconnectInterval=5000] The time (in ms) to wait before trying to reconnect to a client.
@@ -132,10 +132,8 @@ class Server {
                 return callback(err);
             }
 
-            results.client.emit("data", results.data);
             that.sentCount++;
-
-            results.client.once("result", that._handleResult.bind(that, results.client, that.sentCount));
+            results.client.emit("data", results.data, that._handleResult.bind(that, results.client, that.sentCount));
 
             return callback(null);
         });
@@ -159,7 +157,7 @@ class Server {
      * @param {Number} count
      */
     _handleResult(client, count, result){
-        util.debug(this.debug, `Received result: ${result}`);
+        util.debug(this.debug, `Received result: ${JSON.stringify(result)}`);
         this.clientManager.setClientFree(client);
         this.returnedData[count-1] = result;
         this.returnedCount++;
