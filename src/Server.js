@@ -20,12 +20,10 @@ class Server {
      *        by evoking callback(err, data). If a truthy err is passed, it's interpreted as the end
      *        of the data stream.
      * @param {Number} [opt.jobSize=20] Pieces of data to send in each individual batch of job to the clients
-     * @param {Number} [opt.reconnectInterval=5000] The time (in ms) to wait before trying to reconnect to a client.
      */
     constructor(opt) {
         this.debug = opt.debug || false; 
         this.port = opt.port || 80;
-        this.reconnectInterval = opt.reconnectInterval || 5000;
         this.jobSize = opt.jobSize || 20;
 
         if(!opt.data){
@@ -41,10 +39,10 @@ class Server {
         this.data = opt.data;
 
         /**
-         * Keeps track of data sent to a client, but not received back yet
-         * TODO: Implement this so that the disconnected clients don't cause data loss
+         * Keeps track of data sent to a client, but not received back yet.
+         * The keys are either the client's socket id, or "unclaimed"
          */
-        this.buffer = {};
+        this.buffer = {unclaimed:[]};
 
         /**
          * Count of the fetched data
@@ -52,10 +50,6 @@ class Server {
         this.fetchedCount = 0; 
         this.allDataHasBeenFetched = false;
 
-        /**
-         * Count of data groups sent to clients
-         */
-        this.sentCount = 0;
         this.allDataHasBeenSent = false;
 
         /**
@@ -95,11 +89,13 @@ class Server {
         let res = [];
 
         for(let i=0;i<this.returnedCount;i++){
-            this.returnedData[i].forEach((j) => {
-                res.push(j);
-            });
+            if(this.returnedData[i]){
+                this.returnedData[i].forEach((j) => {
+                    res.push(j);
+                });
+            }
         }
-        
+
         return res;
     }
 
@@ -108,7 +104,6 @@ class Server {
      */
     _sendJobs(){
         async.forever(this._sendJob.bind(this), (err) => {
-            this.io.close();
             this.allDataHasBeenSent = true;
         });
     }
@@ -132,43 +127,72 @@ class Server {
                 return callback(err);
             }
 
-            that.sentCount++;
-            results.client.emit("data", results.data, that._handleResult.bind(that, results.client, that.sentCount));
-
+            util.debug(that.debug, "Sending job");
+            that.buffer[results.client.id] = results.data;
+            results.client.emit("data", results.data.data, that._handleResult.bind(that, results.client, results.data.order));
             return callback(null);
         });
     }
 
     /**
-     * Handler for a new client connecting. 
+     * Handler for a new client connecting.
      * 
      * @param {Socket} socket See https://socket.io/docs/server-api/#Socket
      */
     _handleConnection(socket){
         util.debug(this.debug, "A user has connected");
         this.clientManager.addClient.call(this.clientManager, socket);
+
+        socket.on("disconnect", this._handleDisconnect.bind(this, socket));
     }
 
     /**
-     * Handler for a client returning a result
+     * Handler for a client disconnecting. Delegates any data this client might have
+     * in the buffer to "unclaimed"
      * 
      * @param {Socket} client See https://socket.io/docs/server-api/#Socket
-     * @param {Array} result Result returned by the client
-     * @param {Number} count
+     * @param {any} reason Not used here
      */
-    _handleResult(client, count, result){
-        util.debug(this.debug, `Received result: ${JSON.stringify(result)}`);
-        this.clientManager.setClientFree(client);
-        this.returnedData[count-1] = result;
+    _handleDisconnect(client, reason){
+        util.debug(this.debug, `A user has disconnected: ${reason}`);
+        this.clientManager.removeClient(client);
+
+        if(this.buffer[client.id]){
+            this.buffer.unclaimed.push(this.buffer[client.id]);
+            delete this.buffer[client.id];
+        }
+    }
+
+    /**
+     * Handler for a client returning a result.
+     * Increases the returnedCount, puts the returned result into the returnedData object
+     * with the order as the key, deletes the data from the buffer.
+     * 
+     * If all the data has been sent, processed and returned back with the calling of this
+     * function, it invokes the callback to let the user know their data is ready.
+     * 
+     * @param {Socket} client See https://socket.io/docs/server-api/#Socket
+     * @param {Number} count
+     * @param {Array} result Result returned by the client
+     */
+    _handleResult(client, order, result){
+        util.debug(this.debug, "Received result");
+        this.returnedData[order-1] = result;
         this.returnedCount++;
 
-        if(this.allDataHasBeenSent && this.returnedCount === count){
+        delete this.buffer[client.id];
+
+        this.clientManager.setClientFree(client);
+
+        if(this.allDataHasBeenSent && this.returnedCount === this.fetchedCount){
+            this.io.close();
             this.callback(null, this._collectData());
         }
     }
 
     /**
      * Gives a number of data pieces as specified by the count parameter.
+     * 
      * @param {Number} count Number of data pieces to return
      * @param {Function} callback Called with (err, data) where data is an array of
      *                   (maximum) size "count". In case the end of the data is reached, or 
@@ -178,6 +202,12 @@ class Server {
         if(this.allDataHasBeenFetched){
             return callback(new Error("End of Data"));
         }
+
+        if(this.buffer.unclaimed.length){
+            return callback(null, this.buffer.unclaimed.pop());
+        }
+
+        this.fetchedCount++;
 
         switch(this.dataType){
             case "array":
@@ -191,14 +221,14 @@ class Server {
      * Refer to _fetchData.
      */
     _fetchArrayData(count, callback){
-        const data = this.data.slice(this.fetchedCount, this.fetchedCount + count);
+        const index = this.fetchedCount * this.jobSize;
+        const data = this.data.slice(index, index + count);
 
         if(data.length < count){
             this.allDataHasBeenFetched = true;
         }
 
-        this.fetchedCount+=data.length;
-        return callback(null, data);
+        return callback(null, {data, order: this.fetchedCount});
     }
 
     /**
@@ -227,8 +257,7 @@ class Server {
                 that.allDataHasBeenFetched = true;
             }
 
-            that.fetchedCount += returnData.length;
-            return callback(null, returnData);
+            return callback(null, {data: returnData, order:this.fetchedCount});
         });
     }
 }
