@@ -4,9 +4,10 @@ const express = require('express'),
     socketio = require('socket.io'),
     util = require('./util.js'),
     ClientManager = require('./ClientManager.js'),
-    async = require('async');
+    async = require('async'),
+    stream = require('stream');
  
-class Server {
+class Server extends stream.Readable {
 
     /**
      * Initialize the Server
@@ -22,6 +23,8 @@ class Server {
      * @param {Number} [opt.jobSize=20] Pieces of data to send in each individual batch of job to the clients
      */
     constructor(opt) {
+        super({objectMode: true});
+
         this.debug = opt.debug || false; 
         this.port = opt.port || 80;
         this.jobSize = opt.jobSize || 20;
@@ -42,15 +45,19 @@ class Server {
          * Keeps track of data sent to a client, but not received back yet.
          * The keys are either the client's socket id, or "unclaimed"
          */
-        this.buffer = {unclaimed:[]};
+        this.sentDataBuffer = {unclaimed:[]};
+
+        /**
+         * An intermediary collection of the data returned from the clients,
+         * but not written to the stream yet. The keys are the order data groups
+         * were fetched.
+         */
+        this.returnedDataBuffer = {};
 
         /**
          * Count of the fetched data
          */
         this.fetchedCount = 0; 
-        this.allDataHasBeenFetched = false;
-
-        this.allDataHasBeenSent = false;
 
         /**
          * Count of data groups returned by clients
@@ -58,9 +65,12 @@ class Server {
         this.returnedCount = 0;
 
         /**
-         * An intermediary collection of the data returned from the clients
+         * Count of data groups written to the stream
          */
-        this.returnedData = {};
+        this.streamedCount = 0;
+
+        this.allDataHasBeenFetched = false;
+        this.allDataHasBeenSent = false;
 
         this.clientManager = new ClientManager();
     }
@@ -69,28 +79,32 @@ class Server {
      * Starts the server with the specified port, which then starts distributing the 
      * jobs between the clients as they connect.
      * 
-     * @param {Function} callback Callback to invoke after all the data is processed.
-     *                   Invoked with callback(err) with err being null if everything
-     *                   went alright.
+     * It's idempotent: If the server is already sending jobs, calling this function
+     * should not do anything.
      */
-    startJobs(callback){
-        const server = express().listen(this.port);
+    _startJobs(){
+        if(!this.io){ //TODO: Implement some sort of pause/start mechanism
+            const server = express().listen(this.port);
 
-        util.debug(this.debug, `Server listening on port ${this.port}`);
+            util.debug(this.debug, `Server listening on port ${this.port}`);
+    
+            this.io = socketio.listen(server);
+            this.io.on('connection', this._handleConnection.bind(this));
+    
+            this._sendJobs();
+        }
+    }
 
-        this.io = socketio.listen(server);
-        this.io.on('connection', this._handleConnection.bind(this));
-
-        this._sendJobs();
-        this.callback = callback;
+    _read(){
+        this._startJobs();
     }
 
     _collectData(){
         let res = [];
 
         for(let i=0;i<this.returnedCount;i++){
-            if(this.returnedData[i]){
-                this.returnedData[i].forEach((j) => {
+            if(this.returnedDataBuffer[i]){
+                this.returnedDataBuffer[i].forEach((j) => {
                     res.push(j);
                 });
             }
@@ -128,8 +142,11 @@ class Server {
             }
 
             util.debug(that.debug, "Sending job");
-            that.buffer[results.client.id] = results.data;
+
+            // add the data to the sent buffer, then actually send it
+            that.sentDataBuffer[results.client.id] = results.data;
             results.client.emit("data", results.data.data, that._handleResult.bind(that, results.client, results.data.order));
+
             return callback(null);
         });
     }
@@ -157,36 +174,59 @@ class Server {
         util.debug(this.debug, `A user has disconnected: ${reason}`);
         this.clientManager.removeClient(client);
 
-        if(this.buffer[client.id]){
-            this.buffer.unclaimed.push(this.buffer[client.id]);
-            delete this.buffer[client.id];
+        if(this.sentDataBuffer[client.id]){
+            this.sentDataBuffer.unclaimed.push(this.sentDataBuffer[client.id]);
+            delete this.sentDataBuffer[client.id];
         }
     }
 
     /**
      * Handler for a client returning a result.
-     * Increases the returnedCount, puts the returned result into the returnedData object
+     * Increases the returnedCount, puts the returned result into the returnedDataBuffer object
      * with the order as the key, deletes the data from the buffer.
      * 
      * If all the data has been sent, processed and returned back with the calling of this
      * function, it invokes the callback to let the user know their data is ready.
      * 
      * @param {Socket} client See https://socket.io/docs/server-api/#Socket
-     * @param {Number} count
+     * @param {Number} order The order this data was fetched from the data source initially 
      * @param {Array} result Result returned by the client
      */
     _handleResult(client, order, result){
         util.debug(this.debug, "Received result");
-        this.returnedData[order-1] = result;
+
+        this.returnedDataBuffer[order] = result;
         this.returnedCount++;
 
-        delete this.buffer[client.id];
+        this._putIntoStream();
+
+        // the client returned its data so the record can be deleted
+        delete this.sentDataBuffer[client.id];
 
         this.clientManager.setClientFree(client);
 
         if(this.allDataHasBeenSent && this.returnedCount === this.fetchedCount){
             this.io.close();
-            this.callback(null, this._collectData());
+            this.push(null); // Closes the stream
+        }
+    }
+
+    /**
+     * If there is returned data that can be written to the stream, writes it to the stream
+     * and deletes it from the buffer.
+     *
+     * All data should be written to the stream in the order it was fetched, so a data group
+     * can be written only if the data group fetched one before was written into stream already.
+     */
+    _putIntoStream(){
+        while(this.returnedDataBuffer[this.streamedCount + 1]){
+            if(!this.push(this.returnedDataBuffer[this.streamedCount + 1])){
+                break;
+                // TODO: Stop sending jobs if we reach here
+            } else {
+                delete this.returnedDataBuffer[this.streamedCount + 1];
+                this.streamedCount++;
+            }
         }
     }
 
@@ -203,8 +243,8 @@ class Server {
             return callback(new Error("End of Data"));
         }
 
-        if(this.buffer.unclaimed.length){
-            return callback(null, this.buffer.unclaimed.pop());
+        if(this.sentDataBuffer.unclaimed.length){
+            return callback(null, this.sentDataBuffer.unclaimed.pop());
         }
 
         this.fetchedCount++;
@@ -253,6 +293,7 @@ class Server {
         };
 
         async.times(count, wrappedDataFunction, (err) => {
+            // An error from the data function means we ran out of data to fetch
             if(err){
                 that.allDataHasBeenFetched = true;
             }
