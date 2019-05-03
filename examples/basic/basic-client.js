@@ -13,11 +13,9 @@ const findPrimeFactors = (num, callback) => {
     return callback(null, factors);
 };
 
-const c = new distClient({
-    host: "localhost",
+new distClient({
+    host: "http://localhost",
     port: 3000,
     debug: true,
     workFunction: findPrimeFactors
-  });
-
-c.connect();
+}).connect();
