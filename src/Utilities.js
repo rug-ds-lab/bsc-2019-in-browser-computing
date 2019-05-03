@@ -6,7 +6,7 @@ module.exports = {
       console.log(message);
     }
   },
-  error: (message) => {
-      throw new Error(message);
+  error: (message, from='') => {
+      throw new Error(`${message} - ${from}`);
   }
 }
