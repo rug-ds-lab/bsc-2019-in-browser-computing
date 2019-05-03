@@ -1,0 +1,63 @@
+body {
+    display: flex;
+    flex-direction: column;
+    background-color: rgb(107, 107, 107);
+    color: rgb(34, 34, 34);
+    border: 4px;
+}
+
+input[type="checkbox"].ios8-switch {
+    display: flex;
+    position: absolute;   
+    visibility: hidden; 
+}
+
+input[type="checkbox"].ios8-switch + label {
+    position: relative;
+    width: 100%;
+    text-align: center;
+    font-size: 14px;
+    color: lightgray;
+}
+
+input[type="checkbox"].ios8-switch + label:before {
+    content: "";
+    position: absolute;
+    display: block;
+    top: 55px;
+    width: 40px; /* x*5 */
+    height: 24px; /* x*3 */
+    border-radius: 16px; /* x*2 */
+    background: #fff;
+    border: 1px solid #aaa8a8;
+    -webkit-transition: all 0.3s;
+    transition: all 0.3s;
+    margin-bottom: 7px;
+}
+
+input[type="checkbox"].ios8-switch + label:after {
+    content: "";
+    position: absolute;
+    display: block;
+    top: 55px;
+    width: 24px; /* x*3 */
+    height: 24px; /* x*3 */
+    border-radius: 16px; /* x*2 */
+    background: #fff;
+    border: 1px solid #aaa8a8;
+    -webkit-transition: all 0.3s;
+    transition: all 0.3s;
+    cursor: pointer;
+}
+
+input[type="checkbox"].ios8-switch + label:hover:after {
+    box-shadow: 0 0 5px rgba(0,0,0,0.3);
+}
+
+input[type="checkbox"].ios8-switch:checked + label:after {
+    margin-left: 16px;
+}
+
+input[type="checkbox"].ios8-switch:checked + label:before {
+    background: #55D069;
+}
