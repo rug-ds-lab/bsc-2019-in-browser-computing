@@ -21,25 +21,26 @@ class Server extends stream.Readable {
      *        by evoking callback(err, data). If a truthy err is passed, it's interpreted as the end
      *        of the data stream.
      * @param {Number} [opt.jobSize=20] Pieces of data to send in each individual batch of job to the clients
+     * @param {Number} [opt.highWaterMark=100] Maximum number of data batches to put into the stream at once
      */
-    constructor(opt) {
-        super({objectMode: true});
+    constructor({debug, data, port, jobSize, highWaterMark}) {
+        super({objectMode: true, highWaterMark: highWaterMark || 100});
 
-        this.debug = opt.debug || false; 
-        this.port = opt.port || 80;
-        this.jobSize = opt.jobSize || 20;
+        this.debug = debug || false; 
+        this.port = port || 80;
+        this.jobSize = jobSize || 20;
 
-        if(!opt.data){
+        if(!data){
             throw new Error("Data Option is mandatory.");
-        } else if(Array.isArray(opt.data)){
+        } else if(Array.isArray(data)){
             this.dataType = "array";
-        } else if(typeof opt.data === "function"){
+        } else if(typeof data === "function"){
             this.dataType = "function";
         } else {
             throw new Error("Data needs to be an Array or Function.");
         }
 
-        this.data = opt.data;
+        this.data = data;
 
         /**
          * Keeps track of data sent to a client, but not received back yet.
@@ -73,6 +74,8 @@ class Server extends stream.Readable {
         this.allDataHasBeenSent = false;
 
         this.clientManager = new ClientManager();
+        this.io = null; //socket io
+        this.dataSendingRunning = false;
     }
 
     /**
@@ -83,14 +86,16 @@ class Server extends stream.Readable {
      * should not do anything.
      */
     _startJobs(){
-        if(!this.io){ //TODO: Implement some sort of pause/start mechanism
+        if(!this.io){
             const server = express().listen(this.port);
 
             util.debug(this.debug, `Server listening on port ${this.port}`);
     
             this.io = socketio.listen(server);
             this.io.on('connection', this._handleConnection.bind(this));
-    
+        }
+
+        if(!this.dataSendingRunning){
             this._sendJobs();
         }
     }
@@ -99,26 +104,16 @@ class Server extends stream.Readable {
         this._startJobs();
     }
 
-    _collectData(){
-        let res = [];
-
-        for(let i=0;i<this.returnedCount;i++){
-            if(this.returnedDataBuffer[i]){
-                this.returnedDataBuffer[i].forEach((j) => {
-                    res.push(j);
-                });
-            }
-        }
-
-        return res;
-    }
-
     /**
-     * Invoke the _sendJobs function in an infinite loop until end of the data.
+     * Invoke the _sendJob function in an infinite loop.
      */
     _sendJobs(){
+        this.dataSendingRunning = true;
+
         async.forever(this._sendJob.bind(this), (err) => {
-            this.allDataHasBeenSent = true;
+            if(err.message === "End of Data"){
+                this.allDataHasBeenSent = true;
+            }
         });
     }
 
@@ -131,6 +126,10 @@ class Server extends stream.Readable {
      */
     _sendJob(callback){
         const that = this;
+
+        if(!this.dataSendingRunning){
+            return callback(new Error("Paused"));
+        }
 
         // get a free client and data to be sent
         async.parallel({
@@ -198,17 +197,19 @@ class Server extends stream.Readable {
         this.returnedDataBuffer[order] = result;
         this.returnedCount++;
 
-        this._putIntoStream();
-
         // the client returned its data so the record can be deleted
         delete this.sentDataBuffer[client.id];
 
         this.clientManager.setClientFree(client);
 
+        // All data has been sent and also returned back. End of the program.
         if(this.allDataHasBeenSent && this.returnedCount === this.fetchedCount){
             this.io.close();
-            this.push(null); // Closes the stream
+            // Push null at the end so that this eventually closes the stream
+            this.returnedDataBuffer[this.fetchedCount + 1] = null;
         }
+
+        this._putIntoStream();
     }
 
     /**
@@ -217,15 +218,18 @@ class Server extends stream.Readable {
      *
      * All data should be written to the stream in the order it was fetched, so a data group
      * can be written only if the data group fetched one before was written into stream already.
+     * Track of this is kept via streamedCount.
      */
     _putIntoStream(){
-        while(this.returnedDataBuffer[this.streamedCount + 1]){
-            if(!this.push(this.returnedDataBuffer[this.streamedCount + 1])){
-                break;
-                // TODO: Stop sending jobs if we reach here
-            } else {
-                delete this.returnedDataBuffer[this.streamedCount + 1];
-                this.streamedCount++;
+        while(this.dataSendingRunning && this.returnedDataBuffer[this.streamedCount + 1] !== undefined){
+            this.streamedCount++;
+            const pushResult = this.push(this.returnedDataBuffer[this.streamedCount]);
+            delete this.returnedDataBuffer[this.streamedCount];
+
+            // if pushing fails, the stream buffer is full, and we should pause pushing jobs
+            // as well as sending data to clients
+            if(!pushResult){
+                this.dataSendingRunning = false;
             }
         }
     }
