@@ -1,46 +1,45 @@
 'use strict';
 
 const io = require('socket.io-client'),
-    util = require('./util.js'),
-    async = require('async');
+      util = require('./util.js'),
+      async = require('async');
 
 class Client {
 
     /**
      * Initialize a client
-     * @param {Object} opt Consists of the options
-     * @param {String} opt.host Server address. 
-     * @param {Number} [opt.port=80] The port of the server machine.
-     * @param {Boolean} [opt.debug=false] Debug mode
-     * @param {Number} [opt.reconnectInterval=5000] The time (in ms) to wait before trying to reconnect to the server.
-     * @param {Function} opt.workFunction The function the client will perform. Called with (data, callback).
+     * @param {Object} options Consists of the options
+     * @param {String} options.host Server address.
+     * @param {Number} [options.port=80] The port of the server machine.
+     * @param {Boolean} [options.debug=false] Debug mode
+     * @param {Number} [options.reconnectInterval=5000] The time (in ms) to wait before trying to reconnect to the server.
+     * @param {Function} options.workFunction The function the client will perform. Called with (data, callback).
      *                   Expected to call the callback as callback(result) when it's done evaluating the data.
      */
-    constructor(opt) {
-        if(!opt.host){
+    constructor({host, port, debug, reconnectInterval, workFunction}) {
+        if(!host){
             throw new Error("Server address has to be provided.");
         }
-        this.host = opt.host;
+        this.host = host;
 
-        if(!opt.workFunction){
+        if(!workFunction){
             throw new Error("The work function has to be provided.");
         }
-        this.workFunction = opt.workFunction;
+        this.workFunction = workFunction;
 
-        this.port = opt.port || 80;
-        this.debug = opt.debug || false; 
-        this.reconnectInterval = opt.reconnectInterval || 5000;
+        this.port = port || 80;
+        this.debug = debug || false; 
+        this.reconnectInterval = reconnectInterval || 5000;
     }
 
     /**
-     * Connect to the predefined host and port
+     * Connect to the predefined host and port;
      */
     connect() {
         const that = this;
+        const socket = io.connect(`${this.host}${this.port}`);
 
-        const socket = io.connect("http://localhost:3000");
-
-        socket.on('connect', function(){
+        socket.on('connect', () => {
             util.debug(that.debug, "Connected to the host");
         });
 

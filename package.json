@@ -3,13 +3,14 @@
   "version": "0.0.1",
   "description": "Distributed Browser computing framework",
   "scripts": {
-    "server": "node Server.js",
-    "client": "node Client.js"
+    "server": "cd examples/basic & node basic-server.js",
+    "client": "cd examples/basic & node basic-client.js"
   },
   "author": "George Argyrousis & Tolga Parlan",
   "license": "MIT Groningen",
   "homepage": "https://github.com/rug-ds-lab/bsc-2019-in-browser-computing",
   "dependencies": {
+    "async": "^2.6.2",
     "express": "^4.16.4",
     "socket.io": "^2.2.0"
   }
