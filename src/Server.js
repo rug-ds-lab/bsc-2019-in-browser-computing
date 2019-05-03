@@ -23,24 +23,24 @@ class Server extends stream.Readable {
      * @param {Number} [opt.jobSize=20] Pieces of data to send in each individual batch of job to the clients
      * @param {Number} [opt.highWaterMark=100] Maximum number of data batches to put into the stream at once
      */
-    constructor(opt) {
-        super({objectMode: true, highWaterMark: opt.highWaterMark || 100});
+    constructor({debug, data, port, jobSize, highWaterMark}) {
+        super({objectMode: true, highWaterMark: highWaterMark || 100});
 
-        this.debug = opt.debug || false; 
-        this.port = opt.port || 80;
-        this.jobSize = opt.jobSize || 20;
+        this.debug = debug || false; 
+        this.port = port || 80;
+        this.jobSize = jobSize || 20;
 
-        if(!opt.data){
+        if(!data){
             throw new Error("Data Option is mandatory.");
-        } else if(Array.isArray(opt.data)){
+        } else if(Array.isArray(data)){
             this.dataType = "array";
-        } else if(typeof opt.data === "function"){
+        } else if(typeof data === "function"){
             this.dataType = "function";
         } else {
             throw new Error("Data needs to be an Array or Function.");
         }
 
-        this.data = opt.data;
+        this.data = data;
 
         /**
          * Keeps track of data sent to a client, but not received back yet.
