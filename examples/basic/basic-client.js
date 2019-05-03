@@ -1,4 +1,4 @@
-const distClient = require('../../src/DistributedSystem').Client;
+const distClient = require('../../src/Main').Client;
 
 const findPrimeFactors = (num, callback) => {
     let factors = [];

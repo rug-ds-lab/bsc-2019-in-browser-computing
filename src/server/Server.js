@@ -2,8 +2,8 @@
 
 const express = require('express'),
     socketio = require('socket.io'),
-    util = require('./util.js'),
-    ClientManager = require('./ClientManager.js'),
+    util = require('../util.js'),
+    ClientManager = require('./ClientManager.js/index.js'),
     async = require('async'),
     stream = require('stream');
  
@@ -30,13 +30,13 @@ class Server extends stream.Readable {
         this.jobSize = opt.jobSize || 20;
 
         if(!opt.data){
-            throw new Error("Data Option is mandatory.");
+            util.error("Data Option is mandatory.");
         } else if(Array.isArray(opt.data)){
             this.dataType = "array";
         } else if(typeof opt.data === "function"){
             this.dataType = "function";
         } else {
-            throw new Error("Data needs to be an Array or Function.");
+            util.error("Data needs to be an Array or Function.");
         }
 
         this.data = opt.data;

@@ -1,11 +1,10 @@
 'use strict';
 
 const io = require('socket.io-client'),
-      util = require('./util.js'),
+      util = require('../util.js'),
       async = require('async');
 
 class Client {
-
     /**
      * Initialize a client
      * @param {Object} options Consists of the options
@@ -17,14 +16,10 @@ class Client {
      *                   Expected to call the callback as callback(result) when it's done evaluating the data.
      */
     constructor({host, port, debug, reconnectInterval, workFunction}) {
-        if(!host){
-            throw new Error("Server address has to be provided.");
-        }
+        if(!host) util.error("Server address has to be provided.");
         this.host = host;
 
-        if(!workFunction){
-            throw new Error("The work function has to be provided.");
-        }
+        if(!workFunction) util.error("The work function has to be provided.");
         this.workFunction = workFunction;
 
         this.port = port || 80;
@@ -45,6 +40,7 @@ class Client {
 
         // Run the work function whenever data is received
         socket.on('data', (data, callback) => {
+            console.log("we are in?");
             util.debug(that.debug, `Received data from the host: ${JSON.stringify(data)}`);
             async.map(data, that.workFunction, (err, result) => {
                 if(err){

@@ -1,4 +1,4 @@
-const distServer = require('../../src/DistributedSystem').Server;
+const distServer = require('../../src/Main').Server;
 
 let i = 0;
 const data = (callback) => {
@@ -9,15 +9,15 @@ const data = (callback) => {
   return callback(null, i);
 };
 
-const s = new distServer({
+const server = new distServer({
     port:3000,
     data
-  });
+});
 
-s.on('data', (chunk) => {
+server.on('data', (chunk) => {
   console.log(chunk);
 });
 
-s.on('end', () => {
+server.on('end', () => {
   console.log("END");
 });

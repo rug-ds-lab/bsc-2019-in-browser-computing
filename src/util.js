@@ -5,5 +5,8 @@ module.exports = {
     if(debug){
       console.log(message);
     }
+  },
+  error: (message) => {
+      throw new Error(message);
   }
 }
