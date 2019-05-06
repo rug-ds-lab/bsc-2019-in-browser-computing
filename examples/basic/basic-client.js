@@ -2,7 +2,6 @@ const distClient = require('../../src/DistributedSystem').Client;
 
 const findPrimeFactors = (num, callback) => {
     let factors = [];
-    var originalNum = num;
 
     for (let i = 2; i <= num; i++) {
         while ((num % i) === 0) {
@@ -11,7 +10,7 @@ const findPrimeFactors = (num, callback) => {
         }
     }
     
-    return callback(null, {originalNum, factors});
+    return callback(null, factors);
 };
 
 const c = new distClient({
