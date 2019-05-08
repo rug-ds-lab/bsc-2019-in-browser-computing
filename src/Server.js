@@ -6,7 +6,7 @@ const express = require('express'),
     ClientManager = require('./ClientManager.js'),
     async = require('async'),
     stream = require('stream'),
-    EventEmitter = require('events');
+    Data = require('./Data.js');
 
 class Server extends stream.Duplex {
 
@@ -17,13 +17,17 @@ class Server extends stream.Duplex {
      * @param {Boolean} [opt.debug=false] Debug mode
      * @param {Number} [opt.jobSize=20] Pieces of data to send in each individual batch of job to the clients
      * @param {Number} [opt.highWaterMark=100] Maximum number of data batches to put into the stream at once
+     * @param {Number} [opt.redundancy=1] TODO: explain
+     * @param {Function} [opt.equalityFunction]
      */
-    constructor({debug, port, jobSize, highWaterMark}={}) {
+    constructor({debug, port, jobSize, highWaterMark, redundancy, equalityFunction}={}) {
         super({objectMode: true, highWaterMark: highWaterMark || 100});
 
         this.debug = debug || false; 
         this.port = port || 3000;
         this.jobSize = jobSize || 20;
+        this.redundancy = redundancy || 1;
+        this.equalityFunction = equalityFunction || ((obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2));
 
         /**
          * Buffers for data pieces that are:
@@ -33,7 +37,7 @@ class Server extends stream.Duplex {
          *    The keys are the order data was initially read.
          */
         this.dataBuffers = {
-            raw: {unclaimed:[]},
+            raw: [],
             processed: {}
         }
 
@@ -85,8 +89,8 @@ class Server extends stream.Duplex {
         this._startJobs();
     }
 
-    _write(chunk, _encoding, callback){
-        this.dataBuffers.raw.unclaimed.push({order: this.counts.read, data:chunk});
+    _write(data, _encoding, callback){
+        this.dataBuffers.raw.unclaimed.push(new Data(data, this.counts.read));
         this.counts.read++;
         this.emit("new data");
         callback();
@@ -125,21 +129,24 @@ class Server extends stream.Duplex {
         }
 
         // get a free client and data to be sent
-        async.parallel({
-            client: this.clientManager.getFreeClient.bind(this.clientManager),
-            data: this._fetchData.bind(this)
-        }, (err, results) => {
+        this.clientManager.getFreeClient(this.clientManager, (err, client) => {
             if(err){
                 return callback(err);
             }
 
-            util.debug(that.debug, "Sending job");
+            that._fetchData(client, (err, data) => {
+                if(err){
+                    return callback(err);
+                }
 
-            // add the data to the sent buffer, then actually send it
-            that.dataBuffers.raw[results.client.id] = results.data;
-            results.client.emit("data", [results.data.data], that._handleResult.bind(that, results.client, results.data.order));
+                util.debug(that.debug, "Sending job");
 
-            return callback(null);
+                // increase the currentProcessorCount of the data and send it
+                data.currentProcessorCount++;
+                client.emit("data", [data.data], that._handleResult.bind(that, client, data));
+    
+                return callback(null);
+            });
         });
     }
 
@@ -167,7 +174,7 @@ class Server extends stream.Duplex {
         this.clientManager.removeClient(client);
 
         if(this.dataBuffers.raw[client.id]){
-            this.dataBuffers.raw.unclaimed.push(this.dataBuffers.raw[client.id]);
+            this.dataBuffers.raw[client.id].currentProcessorCount--;
             delete this.dataBuffers.raw[client.id];
         }
     }
@@ -181,28 +188,33 @@ class Server extends stream.Duplex {
      * function, it invokes the callback to let the user know their data is ready.
      * 
      * @param {Socket} client See https://socket.io/docs/server-api/#Socket
-     * @param {Number} order The order this data was read from the data source initially 
+     * @param {Data} data
      * @param {Array} result Result processed by the client
      */
-    _handleResult(client, order, result){
+    _handleResult(client, data, result){
         util.debug(this.debug, "Received result");
 
-        this.dataBuffers.processed[order] = result;
-        this.counts.processed++;
+        data.addResult(result, client, this.equalityFunction);
 
         // the client processed its data so the record can be deleted
         delete this.dataBuffers.raw[client.id];
 
-        this.clientManager.setClientFree(client);
+        // if done with processing this piece, move it to the processed buffer
+        if(data.doneWithProcessing){
+            this.dataBuffers.processed[data.order] = data;
+            this.counts.processed++;
+    
+            this.clientManager.setClientFree(client);
+    
+            // All data has been sent and also processed back. End of the program.
+            if(this.flags.allDataHasBeenSent && this.counts.processed === this.counts.read){
+                this.io.close();
+                // Push null at the end so that this eventually closes the stream
+                this.dataBuffers.processed[this.counts.read] = null;
+            }
 
-        // All data has been sent and also processed back. End of the program.
-        if(this.flags.allDataHasBeenSent && this.counts.processed === this.counts.read){
-            this.io.close();
-            // Push null at the end so that this eventually closes the stream
-            this.dataBuffers.processed[this.counts.read] = null;
+            this._putIntoStream();
         }
-
-        this._putIntoStream();
     }
 
     /**
@@ -232,20 +244,24 @@ class Server extends stream.Duplex {
      * 
      * @param {Function} callback Called with (err, data)
      */
-    _fetchData(callback){
-        if(this.dataBuffers.raw.unclaimed.length){
-            return callback(null, this.dataBuffers.raw.unclaimed.shift());
+    _fetchData(client, callback){
+        if((val = this.dataBuffers.raw.find( (el) => el.shouldBeSent() ))){
+            return callback(null, val);
         }
 
+        //TODO: if this.flags.allDataHasBeenRead and there is still data that should be sent,
+        // but none that the current client can handle, handle with this situation. Maybe
+        // return some error that would cause a new client to be fetched
+
         // if the buffer has no data left and this flag has been set, no more data left to fetch
-        if(this.flags.allDataHasBeenRead){
+        if(this.flags.allDataHasBeenRead && this.dataBuffers.raw.length === 0){
             return callback(new Error("End of Data"));
         }
 
         // wait for the "new data" event to be emitted
         const that = this;
         this.once("new data", () => {
-            return that._fetchData(callback);
+            return that._fetchData(client, callback);
         });
     }
 }

@@ -14,6 +14,6 @@ const arrayWriter = es.writeArray(function(err, array){
   console.log(array);
 });
 
-const server = new Server();
+const server = new Server({redundancy:2});
 
 dataStream.pipe(server).pipe(arrayWriter);
