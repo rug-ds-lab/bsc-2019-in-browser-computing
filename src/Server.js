@@ -5,77 +5,58 @@ const express = require('express'),
     util = require('./util.js'),
     ClientManager = require('./ClientManager.js'),
     async = require('async'),
-    stream = require('stream');
- 
-class Server extends stream.Readable {
+    stream = require('stream'),
+    EventEmitter = require('events');
+
+class Server extends stream.Duplex {
 
     /**
      * Initialize the Server
-     * @param {Object} opt Options
-     * @param {Number} [opt.port=80] The Server port.
+     * @param {Object} [opt={}] Options
+     * @param {Number} [opt.port=3000] The Server port.
      * @param {Boolean} [opt.debug=false] Debug mode
-     * @param {Object|Array|Function} opt.data The data that is to be sent to the clients
-     *        for processing. If this is an array, each key/index is simply distributed
-     *        amongst the clients. If a function is passed, the function is called continously 
-     *        with f(callback). The function should return more (and distinct) data at each calling
-     *        by evoking callback(err, data). If a truthy err is passed, it's interpreted as the end
-     *        of the data stream.
      * @param {Number} [opt.jobSize=20] Pieces of data to send in each individual batch of job to the clients
      * @param {Number} [opt.highWaterMark=100] Maximum number of data batches to put into the stream at once
      */
-    constructor({debug, data, port, jobSize, highWaterMark}) {
+    constructor({debug, port, jobSize, highWaterMark}={}) {
         super({objectMode: true, highWaterMark: highWaterMark || 100});
 
         this.debug = debug || false; 
-        this.port = port || 80;
+        this.port = port || 3000;
         this.jobSize = jobSize || 20;
 
-        if(!data){
-            throw new Error("Data Option is mandatory.");
-        } else if(Array.isArray(data)){
-            this.dataType = "array";
-        } else if(typeof data === "function"){
-            this.dataType = "function";
-        } else {
-            throw new Error("Data needs to be an Array or Function.");
+        /**
+         * Buffers for data pieces that are:
+         *  - read and possibly sent to a client, but not processed yet. 
+         *    The keys are either the worker's socket id, or "unclaimed"
+         *  - processed by a worker, but not written to the stream yet. 
+         *    The keys are the order data was initially read.
+         */
+        this.dataBuffers = {
+            raw: {unclaimed:[]},
+            processed: {}
         }
 
-        this.data = data;
-
         /**
-         * Keeps track of data sent to a client, but not received back yet.
-         * The keys are either the client's socket id, or "unclaimed"
+         * Counters for data pieces that are:
+         *  - read from the input stream,
+         *  - processed by the workers
+         *  - written to the output stream
          */
-        this.sentDataBuffer = {unclaimed:[]};
+        this.counts = {
+            read: 0,
+            processed: 0,
+            written: 0
+        }
 
-        /**
-         * An intermediary collection of the data returned from the clients,
-         * but not written to the stream yet. The keys are the order data groups
-         * were fetched.
-         */
-        this.returnedDataBuffer = {};
-
-        /**
-         * Count of the fetched data
-         */
-        this.fetchedCount = 0; 
-
-        /**
-         * Count of data groups returned by clients
-         */
-        this.returnedCount = 0;
-
-        /**
-         * Count of data groups written to the stream
-         */
-        this.streamedCount = 0;
-
-        this.allDataHasBeenFetched = false;
-        this.allDataHasBeenSent = false;
+        this.flags = {
+            allDataHasBeenRead: false,
+            allDataHasBeenSent: false,
+            dataSendingRunning: false
+        }
 
         this.clientManager = new ClientManager();
         this.io = null; //socket io
-        this.dataSendingRunning = false;
     }
 
     /**
@@ -104,6 +85,18 @@ class Server extends stream.Readable {
         this._startJobs();
     }
 
+    _write(chunk, _encoding, callback){
+        this.dataBuffers.raw.unclaimed.push({order: this.counts.read, data:chunk});
+        this.counts.read++;
+        this.emit("new data");
+        callback();
+    }
+
+    _final(callback){
+        this.flags.allDataHasBeenRead = true;
+        callback();
+    }
+
     /**
      * Invoke the _sendJob function in an infinite loop.
      */
@@ -112,7 +105,7 @@ class Server extends stream.Readable {
 
         async.forever(this._sendJob.bind(this), (err) => {
             if(err.message === "End of Data"){
-                this.allDataHasBeenSent = true;
+                this.flags.allDataHasBeenSent = true;
             }
         });
     }
@@ -134,7 +127,7 @@ class Server extends stream.Readable {
         // get a free client and data to be sent
         async.parallel({
             client: this.clientManager.getFreeClient.bind(this.clientManager),
-            data: this._fetchData.bind(this, this.jobSize)
+            data: this._fetchData.bind(this)
         }, (err, results) => {
             if(err){
                 return callback(err);
@@ -143,8 +136,8 @@ class Server extends stream.Readable {
             util.debug(that.debug, "Sending job");
 
             // add the data to the sent buffer, then actually send it
-            that.sentDataBuffer[results.client.id] = results.data;
-            results.client.emit("data", results.data.data, that._handleResult.bind(that, results.client, results.data.order));
+            that.dataBuffers.raw[results.client.id] = results.data;
+            results.client.emit("data", [results.data.data], that._handleResult.bind(that, results.client, results.data.order));
 
             return callback(null);
         });
@@ -173,58 +166,58 @@ class Server extends stream.Readable {
         util.debug(this.debug, `A user has disconnected: ${reason}`);
         this.clientManager.removeClient(client);
 
-        if(this.sentDataBuffer[client.id]){
-            this.sentDataBuffer.unclaimed.push(this.sentDataBuffer[client.id]);
-            delete this.sentDataBuffer[client.id];
+        if(this.dataBuffers.raw[client.id]){
+            this.dataBuffers.raw.unclaimed.push(this.dataBuffers.raw[client.id]);
+            delete this.dataBuffers.raw[client.id];
         }
     }
 
     /**
      * Handler for a client returning a result.
-     * Increases the returnedCount, puts the returned result into the returnedDataBuffer object
+     * Increases the processed, puts the processed result into the dataBuffers.processed object
      * with the order as the key, deletes the data from the buffer.
      * 
-     * If all the data has been sent, processed and returned back with the calling of this
+     * If all the data has been sent, processed and processed back with the calling of this
      * function, it invokes the callback to let the user know their data is ready.
      * 
      * @param {Socket} client See https://socket.io/docs/server-api/#Socket
-     * @param {Number} order The order this data was fetched from the data source initially 
-     * @param {Array} result Result returned by the client
+     * @param {Number} order The order this data was read from the data source initially 
+     * @param {Array} result Result processed by the client
      */
     _handleResult(client, order, result){
         util.debug(this.debug, "Received result");
 
-        this.returnedDataBuffer[order] = result;
-        this.returnedCount++;
+        this.dataBuffers.processed[order] = result;
+        this.counts.processed++;
 
-        // the client returned its data so the record can be deleted
-        delete this.sentDataBuffer[client.id];
+        // the client processed its data so the record can be deleted
+        delete this.dataBuffers.raw[client.id];
 
         this.clientManager.setClientFree(client);
 
-        // All data has been sent and also returned back. End of the program.
-        if(this.allDataHasBeenSent && this.returnedCount === this.fetchedCount){
+        // All data has been sent and also processed back. End of the program.
+        if(this.flags.allDataHasBeenSent && this.counts.processed === this.counts.read){
             this.io.close();
             // Push null at the end so that this eventually closes the stream
-            this.returnedDataBuffer[this.fetchedCount + 1] = null;
+            this.dataBuffers.processed[this.counts.read] = null;
         }
 
         this._putIntoStream();
     }
 
     /**
-     * If there is returned data that can be written to the stream, writes it to the stream
+     * If there is processed data that can be written to the stream, writes it to the stream
      * and deletes it from the buffer.
      *
-     * All data should be written to the stream in the order it was fetched, so a data group
-     * can be written only if the data group fetched one before was written into stream already.
-     * Track of this is kept via streamedCount.
+     * All data should be written to the stream in the order it was read, so a data group
+     * can be written only if the data group read one before was written into stream already.
+     * Track of this is kept via count.written.
      */
     _putIntoStream(){
-        while(this.dataSendingRunning && this.returnedDataBuffer[this.streamedCount + 1] !== undefined){
-            this.streamedCount++;
-            const pushResult = this.push(this.returnedDataBuffer[this.streamedCount]);
-            delete this.returnedDataBuffer[this.streamedCount];
+        while(this.dataSendingRunning && this.dataBuffers.processed[this.counts.written] !== undefined){
+            const pushResult = this.push(this.dataBuffers.processed[this.counts.written]);
+            delete this.dataBuffers.processed[this.counts.written];
+            this.counts.written++;
 
             // if pushing fails, the stream buffer is full, and we should pause pushing jobs
             // as well as sending data to clients
@@ -235,74 +228,24 @@ class Server extends stream.Readable {
     }
 
     /**
-     * Gives a number of data pieces as specified by the count parameter.
+     * Returns a data piece, or throws an error if all the data has been read.
      * 
-     * @param {Number} count Number of data pieces to return
-     * @param {Function} callback Called with (err, data) where data is an array of
-     *                   (maximum) size "count". In case the end of the data is reached, or 
-     *                   the data function returned an error, the err parameter is truthy. 
+     * @param {Function} callback Called with (err, data)
      */
-    _fetchData(count, callback){
-        if(this.allDataHasBeenFetched){
+    _fetchData(callback){
+        if(this.dataBuffers.raw.unclaimed.length){
+            return callback(null, this.dataBuffers.raw.unclaimed.shift());
+        }
+
+        // if the buffer has no data left and this flag has been set, no more data left to fetch
+        if(this.flags.allDataHasBeenRead){
             return callback(new Error("End of Data"));
         }
 
-        if(this.sentDataBuffer.unclaimed.length){
-            return callback(null, this.sentDataBuffer.unclaimed.pop());
-        }
-
-        this.fetchedCount++;
-
-        switch(this.dataType){
-            case "array":
-                return this._fetchArrayData(count, callback);
-            case "function":
-                return this._fetchFunctionData(count, callback);
-        }
-    }
-
-    /**
-     * Refer to _fetchData.
-     */
-    _fetchArrayData(count, callback){
-        const index = this.fetchedCount * this.jobSize;
-        const data = this.data.slice(index, index + count);
-
-        if(data.length < count){
-            this.allDataHasBeenFetched = true;
-        }
-
-        return callback(null, {data, order: this.fetchedCount});
-    }
-
-    /**
-     * Refer to _fetchData.
-     */
-    _fetchFunctionData(count, callback){
+        // wait for the "new data" event to be emitted
         const that = this;
-
-        let returnData = [];
-
-        // This wrapping is needed because the async.times calls the iterate function with (number, callback)
-        // But this number would be irrelevant for the user provided function.
-        const wrappedDataFunction = (_n, callback) => {
-            that.data((err, data) => {
-                if(err){
-                    return callback(err);
-                }
-
-                returnData.push(data);
-                return callback(null);
-            });
-        };
-
-        async.times(count, wrappedDataFunction, (err) => {
-            // An error from the data function means we ran out of data to fetch
-            if(err){
-                that.allDataHasBeenFetched = true;
-            }
-
-            return callback(null, {data: returnData, order:this.fetchedCount});
+        this.once("new data", () => {
+            return that._fetchData(callback);
         });
     }
 }
