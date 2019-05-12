@@ -1,33 +1,20 @@
 'use strict';
 
 const LoadBalancer = require('../server/loadDistribution/LoadBalancer.js');
-const _assert = require('assert');
-/**
- * 
- * @param {Boolean} boolean 
- */
-const assert = (boolean) => {
-    _assert(boolean, "Assertion Failed")
-}
+const ClientManager = require('../server/loadDistribution/ClientManager.js');
+const {assert, nextInt} = require('../Utilities.js');
 
 const generateRandomClients = (seed=10) => {
     const types = ['single', 'chunk', 'adjustable'];
-    const getRandomInt = (min, max) => {
-        const nmin = Math.ceil(min);
-        const nmax = Math.floor(max);
-        //The maximum is exclusive and the minimum is inclusive
-        return Math.floor(Math.random() * (nmax - nmin)) + nmin;
-    };
-
     const clients = {};
 
     for(let i = 0; i < seed; i++) {
         clients[i] = {
-            load: getRandomInt(1, 5),
-            loadType: types[getRandomInt(0, 3)],
+            load: nextInt(1, 5),
+            loadType: types[nextInt(0, 3)],
             //miliseconds
-            responseTime: getRandomInt(100, 800),
-            rating: getRandomInt(-1, 11),
+            responseTime: nextInt(100, 800),
+            rating: 0,
         };
     }
 
@@ -64,14 +51,19 @@ const testLoadBalancerChunk = () => {
     });
 }
 
-const testLoadBalancerAdjustableResponseTime = () => {
-    console.log(generateRandomClients());
+const testClientManagerRating = () => {
+    const clients = generateRandomClients();
+    const clientManager = new ClientManager(clients);
+
+    Object.keys(clients).forEach((client) => {
+        console.log('rating', clientManager.computeClientRating(client));
+    });
 }
 
 const tests = {
     testLoadBalancerSingle,
     testLoadBalancerChunk,
-    testLoadBalancerAdjustableResponseTime,
+    testClientManagerRating,
 };
 Object.keys(tests).forEach((test, i) => {
     try {
