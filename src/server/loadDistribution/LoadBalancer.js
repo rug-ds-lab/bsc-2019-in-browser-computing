@@ -13,6 +13,9 @@ class LoadBalancer {
      * want to distribute accross all connected Clients;
      */
     constructor(clients, distribution, load) {
+        if (!Object.keys(clients).length) util.error('No clients', from);
+        this.clients = clients;
+
         if (!Object.keys(distribution).length) util.error('Type is an empty object', from);
         this.distribution = distribution;
 
@@ -21,6 +24,8 @@ class LoadBalancer {
 
         //The tasks that have been successfully completed by the client;
         this.handledTasks = [];
+
+        this.averageResponseTime = this.averageResponseTime();
 
         //Distribute a single task
         const single = () => {
@@ -43,14 +48,48 @@ class LoadBalancer {
             return returnLoad;
         }
 
+        const adaptive = (id, targetRating=10) => {
+            const {load, responseTime, rating} = this.clients[id];
+         
+            const denominator = this.averageResponseTime * (targetRating - rating);
+            const adaptedLoad = Math.floor(responseTime / denominator);
+            console.log('R: ' + rating + ' pLoad: ' + load + ' nLoad: ' + adaptedLoad);
+
+            return chunck(adaptedLoad);
+        }
+
         const types = {
             single,
             chunck: () => chunck(distribution.size),
+            adaptive: (id) => adaptive(id),
         };
 
         if (!Object.keys(types).includes(distribution.type)) util.error('Invalid Distribution Type', from);
 
         this.types = types;
+    }
+
+    averageResponseTime() {
+        let avgLoad = 0;
+        let avgResponseTime = 0;
+        const clients = this.clients;
+
+        Object.keys(clients).forEach((id) => {
+            const { load, responseTime } = clients[id];
+            avgLoad += load;
+            avgResponseTime += responseTime;
+        });
+
+        return avgResponseTime / avgLoad;
+    }
+
+    computeClientRating(id, avgTask=this.averageResponseTime) {
+        const { load, responseTime } = this.clients[id];
+
+        const denominator = load * avgTask;
+        const negativeWeight = responseTime / denominator;
+
+        return Math.floor(10 - negativeWeight);
     }
 
     /**
@@ -67,8 +106,14 @@ class LoadBalancer {
         return this.load;
     }
 
-    getDistributionTask() {
-        return this.types[this.distribution.type]();
+    getDistributionTask(id=0) {
+        const type = this.distribution.type;
+
+        if(type === 'adaptive') {
+            return this.types[type](id);
+        }
+
+        return this.types[type]();
     }
 
     addHandledTask(task) {

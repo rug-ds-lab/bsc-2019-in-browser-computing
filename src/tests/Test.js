@@ -1,19 +1,18 @@
 'use strict';
 
 const LoadBalancer = require('../server/loadDistribution/LoadBalancer.js');
-const ClientManager = require('../server/loadDistribution/ClientManager.js');
 const {assert, nextInt} = require('../Utilities.js');
 
 const generateRandomClients = (seed=10) => {
     const types = ['single', 'chunk', 'adjustable'];
     const clients = {};
-
+    const loadType = types[nextInt(0, 3)];
     for(let i = 0; i < seed; i++) {
         clients[i] = {
-            load: nextInt(1, 5),
-            loadType: types[nextInt(0, 3)],
+            load: nextInt(1, 300),
+            loadType,
             //miliseconds
-            responseTime: nextInt(100, 800),
+            responseTime: nextInt(400, 3 * 60000),
             rating: 0,
         };
     }
@@ -22,7 +21,7 @@ const generateRandomClients = (seed=10) => {
 }
 
 const testLoadBalancerSingle = () => {
-    const loadBalancer = new LoadBalancer([], {
+    const loadBalancer = new LoadBalancer({ test: {} }, {
         type: 'single'
     }, [1, 2, 3, 4, 5, 6, 7]);
 
@@ -33,7 +32,7 @@ const testLoadBalancerSingle = () => {
 }
 
 const testLoadBalancerChunk = () => {
-    const loadBalancer = new LoadBalancer([], {
+    const loadBalancer = new LoadBalancer({test: {}}, {
         type: 'chunck',
         size: 2,
     }, [1, 2, 3, 4, 5, 6, 7]);
@@ -53,10 +52,24 @@ const testLoadBalancerChunk = () => {
 
 const testClientManagerRating = () => {
     const clients = generateRandomClients();
-    const clientManager = new ClientManager(clients);
+    const steps = [];
+    for(let i = 0; i < 10000; i++) steps.push(i);
+
+    const loadBalancer0 = new LoadBalancer(clients, {
+        type: 'adaptive',
+    }, steps);
 
     Object.keys(clients).forEach((client) => {
-        console.log('rating', clientManager.computeClientRating(client));
+        const rating = loadBalancer0.computeClientRating(client); 
+        clients[client].rating = rating;
+    });
+
+    const loadBalancer = new LoadBalancer(clients, {
+        type: 'adaptive',
+    }, steps);
+
+    Object.keys(clients).forEach((id) => {
+        loadBalancer.getDistributionTask(id);
     });
 }
 

@@ -1,11 +1,10 @@
 'use strict';
+
 const _assert = require('assert');
 
 module.exports = {
     debug: (debug, message) => {
-        if(debug){
-            console.log(message);
-        }
+        if(debug) console.log(message);
     },
     error: (message, from='') => {
         throw new Error(`${message} - ${from}`);
