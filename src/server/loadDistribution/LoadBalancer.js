@@ -5,6 +5,7 @@ class LoadBalancer {
     /**
      * This class is responsible for distributing a workload to each client;
      * 
+     * @param {Object} clients
      * @param {Object} distribution The type of load distribution requested;
      * @param {String} distribution.type The type of load distribution requested;
      * @param {Number: Optional} distribution.size The type of load distribution requested;
