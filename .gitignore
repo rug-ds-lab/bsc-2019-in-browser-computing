@@ -63,4 +63,6 @@ typings/
 # Visual Studio Code
 .vscode/
 
+papers/
+
 package-lock.json
