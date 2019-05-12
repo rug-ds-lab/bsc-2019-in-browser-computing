@@ -3,8 +3,9 @@
   "version": "0.0.1",
   "description": "Distributed Browser computing framework",
   "scripts": {
-    "server": "cd examples/basic & node basic-server.js",
-    "client": "cd examples/basic & node basic-client.js"
+    "server": "cd examples/basic && node basic-server.js",
+    "client": "cd examples/basic && node basic-client.js",
+    "test": "cd src/tests && node Test.js"
   },
   "author": "George Argyrousis & Tolga Parlan",
   "license": "MIT Groningen",

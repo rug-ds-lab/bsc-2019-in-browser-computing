@@ -11,7 +11,7 @@ class LoadBalancer {
      * @param {Array} load The array containing all unique tasks that we
      * want to distribute accross all connected Clients;
      */
-    constructor(distribution, load) {
+    constructor(clients, distribution, load) {
         if (!Object.keys(distribution).length) util.error('Type is an empty object', from);
         this.distribution = distribution;
 
