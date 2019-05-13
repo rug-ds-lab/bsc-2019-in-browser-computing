@@ -30,14 +30,18 @@ class Server extends stream.Duplex {
         this.equalityFunction = equalityFunction || ((obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2));
 
         /**
-         * Buffers for data pieces that are:
-         *  - read and possibly sent to a client, but not processed yet.
-         *  - processed by a worker, but not written to the stream yet. 
-         *    The keys are the order data was initially read.
+         * Buffers for data pieces that:
+         *  - can be sent to a suitable worker right away.
+         *  - are currently being processed by enough workers.
+         *  - are totally processed, but not written to the stream yet. The key is the read order.
+         * 
+         *  Also stores the data/client pair that should be sent the next
+         *  in an object that is {client, data}.
          */
         this.dataBuffers = {
-            raw: [],
-            processed: {},
+            canBeSent: new Set(),
+            beingProcessed: new Set(),
+            processed: new Map(),
             nextOneToSend: null
         }
 
@@ -99,7 +103,7 @@ class Server extends stream.Duplex {
      * Called by the stream implementation when new data is written into this stream.
      */
     _write(data, _encoding, callback){
-        this.dataBuffers.raw.push(new Data({
+        this.dataBuffers.canBeSent.add(new Data({
             data,
             order: this.counts.read,
             redundancy: this.redundancy,
@@ -135,14 +139,12 @@ class Server extends stream.Duplex {
             return callback(new Error("Paused"));
         }
 
-        const dataToSend = this.dataBuffers.raw.filter(data => data.shouldBeSent());
-
         // no data piece available right now: wait and repeat
-        if(!dataToSend.length){
+        if(!this.dataBuffers.canBeSent.size){
             return this.once("Data State Refreshed", this._sendJob.bind(this, callback));
         }
 
-        async.someSeries(this.clientManager.getFreeClients(), this._canVote.bind(this, dataToSend), (err, canSend) => {
+        async.someSeries(this.clientManager.getFreeClients(), this._canVote.bind(this), (err, canSend) => {
             if(err){
                 return callback(err);
             }
@@ -154,11 +156,17 @@ class Server extends stream.Duplex {
 
             util.debug(this.debug, "Sending job");
 
-            let client, data;
-            ({client, data} = this.dataBuffers.nextOneToSend);
+            const {client, data} = this.dataBuffers.nextOneToSend;
             this.dataBuffers.nextOneToSend = null;
 
             data.addVoter(client);
+            client.data.add(data);
+
+            // if we don't need to send this anymore
+            if(!data.shouldBeSent()){
+                this.dataBuffers.canBeSent.delete(data);
+                this.dataBuffers.beingProcessed.add(data);
+            }
 
             this.clientManager.setClientOccupied(client);
             client.emit("data", [data.data], this._handleResult.bind(this, client, data));
@@ -169,15 +177,14 @@ class Server extends stream.Duplex {
 
     /**
      * Returns whether the given client can vote on any of the data items in
-     * the dataToSend array.
+     * the canBeSent buffer.
      * 
-     * @param {Array} dataToSend Array of Data items 
      * @param {String} clientId The ID of the client's socket
      * @param {Function} callback Called with (err, true|false)
      */
-    _canVote(dataToSend, clientId, callback){
+    _canVote(clientId, callback){
         const client = this.clientManager.clients[clientId];
-        const data = dataToSend.find(el => el.canVote(client));
+        const data = Array.from(this.dataBuffers.canBeSent.values()).find((data) => data.canVote(client));
 
         // if found data, save it for later use
         if(data){
@@ -194,8 +201,8 @@ class Server extends stream.Duplex {
      */
     _handleConnection(socket){
         util.debug(this.debug, "A user has connected");
+        socket.data = new Set();
         this.clientManager.addClient.call(this.clientManager, socket);
-        socket.data = [];
         socket.on("disconnect", this._handleDisconnect.bind(this, socket));
     }
 
@@ -211,8 +218,10 @@ class Server extends stream.Duplex {
         util.debug(this.debug, `A user has disconnected: ${reason}`);
         this.clientManager.removeClient(client);
 
-        util.forEach(client.data, (data) => {
+        Array.from(client.data.values()).forEach((data) => {
             data.removeVoter(client);
+            this.dataBuffers.beingProcessed.delete(data);
+            this.dataBuffers.canBeSent.add(data);
             this.emit("Data State Refreshed");
         });
     }
@@ -228,20 +237,20 @@ class Server extends stream.Duplex {
         util.debug(this.debug, "Received result");
 
         data.addResult(result);
-        delete client.data[data.order];
+        client.data.delete(data);
         this.clientManager.setClientFree(client);
 
         // if done with processing this piece, move it to the processed buffer
         if(data.doneWithProcessing()){
-            this.dataBuffers.raw = this.dataBuffers.raw.filter(el => data !== el);
-            this.dataBuffers.processed[data.order] = data;
+            this.dataBuffers.beingProcessed.delete(data);
+            this.dataBuffers.processed.set(data.order, data);
             this.counts.processed++;
     
-            // All data has been sent and also processed back. End of the program.
+            // All data has been read and processed. End of the program.
             if(this.flags.allDataHasBeenRead && this.counts.processed === this.counts.read){
                 this.io.close();
                 // Push null at the end so that this eventually closes the stream
-                this.dataBuffers.processed[this.counts.read] = null;
+                this.dataBuffers.processed.set(this.counts.read, null);
                 this.flags.allDataHasBeenProcessed = true;
                 this.emit("Data State Refreshed");
             }
@@ -260,14 +269,14 @@ class Server extends stream.Duplex {
      * can be written only if the data group read one before was written into stream already.
      */
     _putIntoStream(){
-        while(this.dataSendingRunning && this.dataBuffers.processed[this.counts.written] !== undefined){
-            let res = this.dataBuffers.processed[this.counts.written];
+        while(this.dataSendingRunning && this.dataBuffers.processed.get(this.counts.written) !== undefined){
+            let res = this.dataBuffers.processed.get(this.counts.written);
             if(res){
                 res = res.getMajorityResult();
             }
 
             const pushResult = this.push(res);
-            delete this.dataBuffers.processed[this.counts.written];
+            this.dataBuffers.processed.delete(this.counts.written);
             this.counts.written++;
 
             // if pushing fails, the stream buffer is full, and we should pause pushing jobs
