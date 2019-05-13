@@ -1,10 +1,12 @@
 class Data{
-  constructor(data, order){
+  constructor({data, order, redundancy, equalityFunction}){
     this.data = data;
     this.order = order;
+    this.redundancy = redundancy;
+    this.equalityFunction = equalityFunction;
 
     this.results = []; // objects with data, count keys
-    this.clientsProcessed = []; // clients that processed this data
+    this.voters = []; // clients that are processing/processed this data
     this.majorityCount = 0;
     this.totalCount = 0;
     this.currentProcessorCount = 0; //number of nodes currently processing this data piece
@@ -12,19 +14,36 @@ class Data{
 
   // should be sent if (assuming all current processors return correctly), majority would 
   // still not have enough difference over the rest 
-  shouldBeSent(redundancy){
-    return redundancy > this.currentProcessorCount + (2*this.totalCount - this.majorityCount);
+  shouldBeSent(){
+    return this.redundancy > this.currentProcessorCount + (2*this.totalCount - this.majorityCount);
   }
 
-  doneWithProcessing(redundancy){
-    return (2*this.totalCount - this.majorityCount) >= redundancy;
+  doneWithProcessing(){
+    return (2*this.totalCount - this.majorityCount) >= this.redundancy;
   }
-  
-  //add result, update the counts
-  addResult(result, client, equalityFunction){
-    this.clientsProcessed.push(client.id);
 
-    let res = this.results.find((el) => equalityFunction(el.data, result));
+  addVoter(client){
+    this.voters.push(client);
+    this.currentProcessorCount++;
+  }
+
+  removeVoter(client){
+    this.voters = this.voters.filter(el => el.id !== client.id);
+    this.currentProcessorCount--;
+  }
+
+  canVote(client){
+    return !this.voters.find(el => el.id === client.id);
+  }
+
+  getMajorityResult(){
+    return this.results.reduce((acc, cur) => acc.count > cur.count ? acc : cur, {}).data;
+  }
+
+  addResult(result){
+    this.currentProcessorCount--;
+
+    let res = this.results.find((el) => this.equalityFunction(el.data, result));
     if(res){
       res.count++;
     } else {
@@ -38,9 +57,6 @@ class Data{
     this.totalCount++;
   }
 
-  processedByClient(client){
-    return this.clientsProcessed.includes(client.id);
-  }
 }
 
 module.exports = Data;

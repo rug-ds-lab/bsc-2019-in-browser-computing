@@ -42,20 +42,14 @@ class ClientManager extends EventEmitter{
     this.freeClients.splice(this.freeClients.indexOf(client.id), 1);
   }
 
-  // /**
-  //  * Returns one client that is currently not busy. A client that is requested
-  //  * here should later be indicated as free through setClientFree function when they are
-  //  * done with their job.
-  //  * 
-  //  * @param {Function} callback Called with callback(err, client) when a client comes up free
-  //  */
-  // getFreeClient(callback){
-  //   if(this.freeClients.length){
-  //     return callback(null, this.clients[this.freeClients.pop()]);
-  //   }
-
-  //   this.once("client-freed", this.getFreeClient.bind(this, callback));
-  // }
+  /**
+   * Get an array of all the clients that are free right now
+   * 
+   * @returns {Array} Array with the IDs of freeclients
+   */
+  getFreeClients(){
+    return this.freeClients;
+  }
 
   /**
    * Marks the given client as non-busy.
