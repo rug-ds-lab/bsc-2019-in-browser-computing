@@ -11,15 +11,12 @@ class ClientManager extends EventEmitter{
   constructor(){
     super();
 
-    /**
-     * The keys are the socket ids, the values are the sockets themselves.
-     */
-    this.clients = {};
+    this.clients = new Set();
 
     /**
-     * Keeps track of the clients that aren't doing anything right now.
+     * Keeps track of the clients that can accept 
      */
-    this.freeClients = [];
+    this.freeClients = new Set();
   }
 
   /**
@@ -28,7 +25,7 @@ class ClientManager extends EventEmitter{
    * @param {Socket} client See https://socket.io/docs/server-api/#Socket
    */
   addClient(client){
-    this.clients[client.id] = client;
+    this.clients.add(client);
     this.setClientFree(client);
   }
 
@@ -38,14 +35,12 @@ class ClientManager extends EventEmitter{
    * @param {Socket} client See https://socket.io/docs/server-api/#Socket
    */
   removeClient(client){
-    delete this.clients[client.id];
-    this.freeClients.splice(this.freeClients.indexOf(client.id), 1);
+    this.clients.delete(client);
+    this.freeClients.delete(client);
   }
 
   /**
-   * Get an array of all the clients that are free right now
-   * 
-   * @returns {Array} Array with the IDs of freeclients
+   * @returns {Set} Set of all the clients that can accept work
    */
   getFreeClients(){
     return this.freeClients;
@@ -57,12 +52,12 @@ class ClientManager extends EventEmitter{
    * @param {Function} callback Called with callback(err, client) when a client comes up free
    */
   setClientFree(client){
-    this.freeClients.push(client.id);
-    this.emit("client-freed");
+    this.freeClients.add(client);
+    this.emit("Client Available");
   }
 
   setClientOccupied(client){
-    this.freeClients = this.freeClients.filter(el => el !== client.id);
+    this.freeClients.delete(client);
   }
 }
 

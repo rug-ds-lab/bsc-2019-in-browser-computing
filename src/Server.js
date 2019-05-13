@@ -63,8 +63,7 @@ class Server extends stream.Duplex {
             dataSendingRunning: false
         }
 
-        this.clientManager = new ClientManager();
-        this.clientManager.on("client-freed", () => {this.emit("Data State Refreshed")});
+        this.clientManager = new ClientManager().on("Client Available", this.emit.bind(this, "Data State Refreshed"));
         this.io = null; //socket io
     }
 
@@ -179,11 +178,10 @@ class Server extends stream.Duplex {
      * Returns whether the given client can vote on any of the data items in
      * the canBeSent buffer.
      * 
-     * @param {String} clientId The ID of the client's socket
+     * @param {Socket} client See https://socket.io/docs/server-api/#Socket
      * @param {Function} callback Called with (err, true|false)
      */
-    _canVote(clientId, callback){
-        const client = this.clientManager.clients[clientId];
+    _canVote(client, callback){
         const data = Array.from(this.dataBuffers.canBeSent.values()).find((data) => data.canVote(client));
 
         // if found data, save it for later use
@@ -202,7 +200,7 @@ class Server extends stream.Duplex {
     _handleConnection(socket){
         util.debug(this.debug, "A user has connected");
         socket.data = new Set();
-        this.clientManager.addClient.call(this.clientManager, socket);
+        this.clientManager.addClient(socket);
         socket.on("disconnect", this._handleDisconnect.bind(this, socket));
     }
 
@@ -218,7 +216,7 @@ class Server extends stream.Duplex {
         util.debug(this.debug, `A user has disconnected: ${reason}`);
         this.clientManager.removeClient(client);
 
-        Array.from(client.data.values()).forEach((data) => {
+        client.data.forEach((data) => {
             data.removeVoter(client);
             this.dataBuffers.beingProcessed.delete(data);
             this.dataBuffers.canBeSent.add(data);
@@ -230,7 +228,7 @@ class Server extends stream.Duplex {
      * Handler for a client returning a result. The result is saved and the client is set free.
      * 
      * @param {Socket} client See https://socket.io/docs/server-api/#Socket
-     * @param {Data} data
+     * @param {Data} data The concerned data object
      * @param {Array} result Result processed by the client
      */
     _handleResult(client, data, result){
