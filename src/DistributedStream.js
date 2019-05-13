@@ -8,10 +8,10 @@ const express = require('express'),
     stream = require('stream'),
     Data = require('./Data.js');
 
-class Server extends stream.Duplex {
+class DistributedStream extends stream.Duplex {
 
     /**
-     * Initialize the Server
+     * Initialize the stream
      * @param {Object} [opt={}] Options
      * @param {Boolean} [opt.debug=false] Debug mode
      * @param {Number} [opt.jobSize=20] Pieces of data to send in each individual batch of job to the clients
@@ -215,7 +215,7 @@ class Server extends stream.Duplex {
      * client will be handled properly later on.
      * 
      * @param {Socket} client See https://socket.io/docs/server-api/#Socket
-     * @param {any} reason Not used here
+     * @param {String} reason Reason for the disconnection
      */
     _handleDisconnect(client, reason){
         util.debug(this.debug, `A user has disconnected: ${reason}`);
@@ -290,4 +290,4 @@ class Server extends stream.Duplex {
     }
 }
 
-module.exports = Server;
+module.exports = DistributedStream;
