@@ -13,14 +13,16 @@ class Server extends stream.Duplex {
     /**
      * Initialize the Server
      * @param {Object} [opt={}] Options
-     * @param {Number} [opt.port=3000] The Server port.
      * @param {Boolean} [opt.debug=false] Debug mode
      * @param {Number} [opt.jobSize=20] Pieces of data to send in each individual batch of job to the clients
      * @param {Number} [opt.highWaterMark=100] Maximum number of data batches to put into the stream at once
      * @param {Number} [opt.redundancy=1] Redundancy factor used for the voting algorithm. Defaults to no redundancy
-     * @param {Function} [opt.equalityFunction]
+     * @param {Function} [opt.equalityFunction] The function used to compare if two results are the same
+     * @param {http.Server} [httpServer] The http server instance to use. If not given, a new express server will listen
+     *        at the given opt.port
+     * @param {Number} [opt.port=3000] Effective only if no opt.httpServer is passed.
      */
-    constructor({debug, port, jobSize, highWaterMark, redundancy, equalityFunction}={}) {
+    constructor({debug, port, jobSize, highWaterMark, redundancy, equalityFunction, httpServer}={}) {
         super({objectMode: true, highWaterMark: highWaterMark || 100});
 
         this.debug = debug || false; 
@@ -28,6 +30,7 @@ class Server extends stream.Duplex {
         this.jobSize = jobSize || 20;
         this.redundancy = redundancy || 1;
         this.equalityFunction = equalityFunction || ((obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2));
+        this.httpServer = httpServer;
 
         /**
          * Buffers for data pieces that:
@@ -76,11 +79,13 @@ class Server extends stream.Duplex {
      */
     _startJobs(){
         if(!this.io){
-            const server = express().listen(this.port);
+            if(!this.httpServer){
+                this.httpServer = express().listen(this.port);
+            }
 
             util.debug(this.debug, `Server listening on port ${this.port}`);
     
-            this.io = socketio.listen(server);
+            this.io = socketio(this.httpServer);
             this.io.on('connection', this._handleConnection.bind(this));
         }
 
@@ -246,7 +251,6 @@ class Server extends stream.Duplex {
     
             // All data has been read and processed. End of the program.
             if(this.flags.allDataHasBeenRead && this.counts.processed === this.counts.read){
-                this.io.close();
                 // Push null at the end so that this eventually closes the stream
                 this.dataBuffers.processed.set(this.counts.read, null);
                 this.flags.allDataHasBeenProcessed = true;

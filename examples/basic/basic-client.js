@@ -1,5 +1,3 @@
-const distClient = require('../../src/DistributedSystem').Client;
-
 const findPrimeFactors = (num, callback) => {
     let factors = [];
 
@@ -13,7 +11,7 @@ const findPrimeFactors = (num, callback) => {
     return callback(null, factors);
 };
 
-const c = new distClient({
+const c = new Client({
     host: "localhost",
     port: 3000,
     debug: true,

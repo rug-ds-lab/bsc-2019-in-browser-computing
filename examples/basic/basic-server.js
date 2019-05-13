@@ -1,19 +1,24 @@
-const Server = require('../../src/DistributedSystem').Server,
-  es = require('event-stream');
+const DistributedStream = require('../../src/DistributedStream'),
+  es = require('event-stream'),
+  path = require('path');
 
-// Stream constructed from a function that simply counts from 0 till 1000
-const dataStream = es.readable(function(i, callback)  {
+// Set a single server serving a single page
+const express = require('express')
+const app = express()
+const port = 3000;
+
+app.use(express.static(path.join(__dirname, '../../')))
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+const httpServer = app.listen(port, () => console.log(`Listening on ${port}!`));
+
+const distributedStream = new DistributedStream({redundancy:2, httpServer});
+
+// Stream constructed from a function that simply counts from 0 till 5000
+const numberStream = es.readable(function(i, callback)  {
   if(i > 5000){
     return this.emit('end')
   }
   return callback(null, i.toString());
 });
 
-// Stream that reads all its input into an array and console.logs it
-const arrayWriter = es.writeArray(function(err, array){
-  console.log(array);
-});
-
-const server = new Server({redundancy:2, debug:true});
-
-dataStream.pipe(server).pipe(arrayWriter);
+numberStream.pipe(distributedStream).pipe(es.stringify()).pipe(process.stdout);
