@@ -6,36 +6,40 @@ class Data{
     this.results = []; // objects with data, count keys
     this.clientsProcessed = []; // clients that processed this data
     this.majorityCount = 0;
-    this.runnerUpCount = 0;
+    this.totalCount = 0;
     this.currentProcessorCount = 0; //number of nodes currently processing this data piece
   }
 
-  // determines if this data piece should still be sent to clients
+  // should be sent if (assuming all current processors return correctly), majority would 
+  // still not have enough difference over the rest 
   shouldBeSent(redundancy){
-    return redundancy > this.currentProcessorCount + (this.majorityCount - this.runnerUpCount);
+    return redundancy > this.currentProcessorCount + (2*this.totalCount - this.majorityCount);
   }
 
   doneWithProcessing(redundancy){
-    return !this.currentProcessorCount && (this.majorityCount - this.runnerUpCount) >= redundancy;
+    return (2*this.totalCount - this.majorityCount) >= redundancy;
   }
   
-  //add result, update counts
+  //add result, update the counts
   addResult(result, client, equalityFunction){
     this.clientsProcessed.push(client.id);
-    if((res = this.results.find((el) => equalityFunction(el.data, result)))){
+
+    let res = this.results.find((el) => equalityFunction(el.data, result));
+    if(res){
       res.count++;
     } else {
-      this.result.push({data:result, count:1});
+      this.results.push({data:result, count:1});
     }
-    //update counts
-    const that = this;
-    this.results.forEach((el) => {
-      if(el.count > that.majorityCount){
-        that.majorityCount = el.count;
-      } else if(el.count > that.runnerUpCount) {
-        that.runnerUpCount = el.count;
-      }
-    });
+
+    const val = (res ? res.count : 1);
+    if(val > this.majorityCount){
+      this.majorityCount = val;
+    }
+    this.totalCount++;
+  }
+
+  processedByClient(client){
+    return this.clientsProcessed.includes(client.id);
   }
 }
 

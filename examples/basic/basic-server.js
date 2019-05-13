@@ -3,7 +3,7 @@ const Server = require('../../src/DistributedSystem').Server,
 
 // Stream constructed from a function that simply counts from 0 till 1000
 const dataStream = es.readable(function(i, callback)  {
-  if(i > 1000){
+  if(i > 5000){
     return this.emit('end')
   }
   return callback(null, i.toString());
@@ -14,6 +14,6 @@ const arrayWriter = es.writeArray(function(err, array){
   console.log(array);
 });
 
-const server = new Server({redundancy:2});
+const server = new Server({redundancy:2, debug:true});
 
 dataStream.pipe(server).pipe(arrayWriter);
