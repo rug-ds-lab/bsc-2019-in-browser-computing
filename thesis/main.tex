@@ -4,6 +4,11 @@
 \usepackage{graphicx}
 \usepackage[british]{babel}
 
+% gets the page numbers to a proper place somehow
+\clearscrheadfoot
+\ohead[]{\headmark}
+\cfoot[\pagemark]{\pagemark}
+
 \begin{document}
 
 \input{./titlepage.tex}
