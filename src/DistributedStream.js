@@ -1,7 +1,6 @@
 'use strict';
 
-const util = require('./Utilities.js'),
-    ClientManager = require('./server/ClientManager.js'),
+const ClientManager = require('./server/ClientManager.js'),
     Server = require('./server/Server.js'),
     DataHandler = require('./DataHandler.js'),
     Data = require('./Data.js'),
@@ -38,9 +37,10 @@ class DistributedStream extends stream.Duplex {
 
         this.debug = debug;
 
-        this.backPressure = true; // don't start sending jobs until _read is called
+        // don't start sending jobs until _read is called
+        this.backPressure = true; 
 
-        /** count of data pieces written to the stream */
+        // count of data pieces written to the stream
         this.writtenCount = 0;
 
         this.dataHandler = new DataHandler({equalityFunction, redundancy})

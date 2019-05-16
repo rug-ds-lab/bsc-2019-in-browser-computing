@@ -5,11 +5,14 @@ class Data{
     this.redundancy = redundancy;
     this.equalityFunction = equalityFunction;
 
-    this.results = []; // objects with data, count keys
-    this.voters = []; // clients that are processing/processed this data
+    // objects with data, count keys
+    this.results = [];
+    // clients that are processing/processed this data
+    this.voters = []; 
     this.majorityCount = 0;
     this.totalCount = 0;
-    this.currentProcessorCount = 0; //number of nodes currently processing this data piece
+    //number of nodes currently processing this data piece
+    this.currentProcessorCount = 0;
   }
 
   // should be sent if (assuming all current processors return correctly), majority would 
@@ -42,12 +45,14 @@ class Data{
 
   addResult(result){
     this.currentProcessorCount--;
-
-    let res = this.results.find((el) => this.equalityFunction(el.data, result));
+    const res = this.results.find(({data}) => this.equalityFunction(data, result));
     if(res){
-      res.count++;
+        res.count++;
     } else {
-      this.results.push({data:result, count:1});
+        this.results.push({
+            data: result, 
+            count: 1,
+        });
     }
 
     const val = (res ? res.count : 1);
