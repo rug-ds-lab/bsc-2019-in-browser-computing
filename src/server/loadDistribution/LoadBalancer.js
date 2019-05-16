@@ -48,12 +48,14 @@ class LoadBalancer {
             return returnLoad;
         }
 
-        const adaptive = (id, targetRating=10) => {
+        const adaptive = (id) => {
             const {load, responseTime, rating} = this.clients[id];
-         
-            const denominator = this.averageResponseTime * (targetRating - rating);
-            const adaptedLoad = Math.floor(responseTime / denominator);
-            console.log('R: ' + rating + ' pLoad: ' + load + ' nLoad: ' + adaptedLoad);
+            const avgClientTime = responseTime / load;
+            const deltaLoad = ((this.averageResponseTime - avgClientTime) * load) / avgClientTime;
+            const adaptedLoad = Math.floor(deltaLoad + load);
+            
+            console.log(this.averageResponseTime);
+            console.log('R:' + rating + ' Response: ' + responseTime + ' pLoad: ' + load + ' nLoad: ' + adaptedLoad);
 
             return chunck(adaptedLoad);
         }
@@ -80,16 +82,15 @@ class LoadBalancer {
             avgResponseTime += responseTime;
         });
 
-        return avgResponseTime / avgLoad;
+        return Math.floor(avgResponseTime / avgLoad);
     }
 
     computeClientRating(id, avgTask=this.averageResponseTime) {
         const { load, responseTime } = this.clients[id];
 
-        const denominator = load * avgTask;
-        const negativeWeight = responseTime / denominator;
+        const perfectLoad = responseTime / avgTask;
 
-        return Math.floor(10 - negativeWeight);
+        return Math.floor(11 - perfectLoad / load);
     }
 
     /**
