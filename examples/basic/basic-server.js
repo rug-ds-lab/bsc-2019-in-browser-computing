@@ -1,23 +1,19 @@
-const distServer = require('../../src/Main').Server;
+const Server = require('../../src/DistributedSystem').Server,
+  es = require('event-stream');
 
-let i = 0;
-const data = (callback) => {
-  i++;
+// Stream constructed from a function that simply counts from 0 till 1000
+const dataStream = es.readable(function(i, callback)  {
   if(i > 1000){
-    return callback(new Error("End of data"));
+    return this.emit('end')
   }
-  return callback(null, i);
-};
-
-const server = new distServer({
-    port:3000,
-    data
+  return callback(null, i.toString());
 });
 
-server.on('data', (chunk) => {
-  console.log(chunk);
+// Stream that reads all its input into an array and console.logs it
+const arrayWriter = es.writeArray(function(err, array){
+  console.log(array);
 });
 
-server.on('end', () => {
-  console.log("END");
-});
+const server = new Server();
+
+dataStream.pipe(server).pipe(arrayWriter);

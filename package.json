@@ -12,6 +12,7 @@
   "homepage": "https://github.com/rug-ds-lab/bsc-2019-in-browser-computing",
   "dependencies": {
     "async": "^2.6.2",
+    "event-stream": "^4.0.1",
     "express": "^4.16.4",
     "socket.io": "^2.2.0"
   }
