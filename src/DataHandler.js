@@ -12,7 +12,6 @@ class DataHandler extends EventEmitter {
          * Counters for data pieces that are:
          *  - read from the input stream,
          *  - processed by the workers
-         *  - written to the output stream
          */
         this.counts = {
             read: 0,

@@ -1,5 +1,5 @@
 const findPrimeFactors = (num, callback) => {
-    let factors = [];
+    const factors = [];
 
     for (let i = 2; i <= num; i++) {
         while ((num % i) === 0) {
@@ -12,7 +12,7 @@ const findPrimeFactors = (num, callback) => {
 };
 
 new Client({
-    host: "localhost",
+    host: "http://localhost:",
     port: 3000,
     debug: true,
     workFunction: findPrimeFactors,
