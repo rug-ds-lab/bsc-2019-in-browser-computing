@@ -93,8 +93,6 @@ class DistributedStream extends stream.Duplex {
         if(this.backPressure){
             return this.once("resume", this._sendJob.bind(this, client));
         }
-        console.log('----------------------------')
-        console.log(client);
 
         const count = 100; //this.loadBalancer.getDistributionTask(client); //TODO: Make this work
 
