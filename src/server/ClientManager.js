@@ -12,11 +12,6 @@ class ClientManager extends EventEmitter{
     super();
 
     this.clients = new Set();
-
-    /**
-     * Keeps track of the clients that can accept 
-     */
-    this.freeClients = new Set();
   }
 
   /**
@@ -28,7 +23,6 @@ class ClientManager extends EventEmitter{
     client.data = new Set();
     this.clients.add(client);
     client.on("disconnect", this.removeClient.bind(this, client));
-    this.setClientFree(client);
   }
 
   /**
@@ -38,29 +32,14 @@ class ClientManager extends EventEmitter{
    */
   removeClient(client){
     this.clients.delete(client);
-    this.freeClients.delete(client);
     this.emit("disconnection", client);
   }
 
   /**
    * @returns {Set} Set of all the clients that can accept work
    */
-  getFreeClients(){
-    return this.freeClients;
-  }
-
-  /**
-   * Marks the given client as non-busy.
-   * 
-   * @param {Function} callback Called with callback(err, client) when a client comes up free
-   */
-  setClientFree(client){
-    this.freeClients.add(client);
-    this.emit("available-client", client);
-  }
-
-  setClientOccupied(client){
-    this.freeClients.delete(client);
+  getClients(){
+    return this.clients;
   }
 }
 
