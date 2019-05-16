@@ -50,19 +50,10 @@ const testLoadBalancerChunk = () => {
     });
 }
 
-const testClientManagerRating = () => {
+const testLoadBalancerAdaptive = () => {
     const clients = generateRandomClients();
     const steps = [];
     for(let i = 0; i < 10000; i++) steps.push(i);
-
-    const loadBalancer0 = new LoadBalancer(clients, {
-        type: 'adaptive',
-    }, steps);
-
-    Object.keys(clients).forEach((client) => {
-        const rating = loadBalancer0.computeClientRating(client); 
-        clients[client].rating = rating;
-    });
 
     const loadBalancer = new LoadBalancer(clients, {
         type: 'adaptive',
@@ -76,7 +67,7 @@ const testClientManagerRating = () => {
 const tests = {
     testLoadBalancerSingle,
     testLoadBalancerChunk,
-    testClientManagerRating,
+    testLoadBalancerAdaptive,
 };
 Object.keys(tests).forEach((test, i) => {
     try {

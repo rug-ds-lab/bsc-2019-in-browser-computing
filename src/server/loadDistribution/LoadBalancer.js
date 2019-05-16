@@ -8,26 +8,25 @@ class LoadBalancer {
      * @param {Object} clients
      * @param {Object} distribution The type of load distribution requested;
      * @param {String} distribution.type The type of load distribution requested;
-     * @param {Number: Optional} distribution.size The type of load distribution requested;
+     * @param {Number | Optional} distribution.size The type of load distribution requested;
      * @param {Array} load The array containing all unique tasks that we
      * want to distribute accross all connected Clients;
      */
     constructor(clients, distribution, load) {
-        if (!Object.keys(clients).length) util.error('No clients', from);
+        this.validateObject(clients, 'No clients');
         this.clients = clients;
 
-        if (!Object.keys(distribution).length) util.error('Type is an empty object', from);
+        this.validateObject(distribution, 'Type is an empty object');
         this.distribution = distribution;
 
         if (!load.length) util.error('Load is an empty array', from);
         this.load = load;
 
-        //The tasks that have been successfully completed by the client;
-        this.handledTasks = [];
-
         this.averageResponseTime = this.averageResponseTime();
 
-        //Distribute a single task
+        /**
+         * Distribute a singular task to the client;
+         */
         const single = () => {
             return !this.load.length ?
                 []
@@ -35,8 +34,12 @@ class LoadBalancer {
                 this.load.shift();
         };
 
-        //Distribute an array of tasks
-        const chunck = (size=2) => {
+        /**
+         * Distribute an array of tasks to the client;
+         * 
+         * @param {Number} size 
+         */
+        const chunck = (size=this.distribution.size) => {
             if(size <= 1 || this.load.length <= 1) return single();
 
             if (size >= this.load.length) size = this.load.length;
@@ -48,21 +51,26 @@ class LoadBalancer {
             return returnLoad;
         }
 
+        /**
+         * Distribute tasks based on the response time of
+         * each client;
+         * 
+         * @param {Number} id 
+         */
         const adaptive = (id) => {
-            const {load, responseTime, rating} = this.clients[id];
-            const avgClientTime = responseTime / load;
-            const deltaLoad = ((this.averageResponseTime - avgClientTime) * load) / avgClientTime;
+            const {load, responseTime} = this.clients[id];
+
+            const avgClientTimePerTask = responseTime / load;
+            const missedTasks = (this.averageResponseTime - avgClientTimePerTask) * load;
+            const deltaLoad = missedTasks / avgClientTimePerTask;
             const adaptedLoad = Math.floor(deltaLoad + load);
-            
-            console.log(this.averageResponseTime);
-            console.log('R:' + rating + ' Response: ' + responseTime + ' pLoad: ' + load + ' nLoad: ' + adaptedLoad);
 
             return chunck(adaptedLoad);
         }
 
         const types = {
             single,
-            chunck: () => chunck(distribution.size),
+            chunck: () => chunck(),
             adaptive: (id) => adaptive(id),
         };
 
@@ -71,6 +79,11 @@ class LoadBalancer {
         this.types = types;
     }
 
+    /**
+     * Compute the average response time of all clients;
+     * 
+     * @returns {Number} 
+     */
     averageResponseTime() {
         let avgLoad = 0;
         let avgResponseTime = 0;
@@ -83,14 +96,6 @@ class LoadBalancer {
         });
 
         return Math.floor(avgResponseTime / avgLoad);
-    }
-
-    computeClientRating(id, avgTask=this.averageResponseTime) {
-        const { load, responseTime } = this.clients[id];
-
-        const perfectLoad = responseTime / avgTask;
-
-        return Math.floor(11 - perfectLoad / load);
     }
 
     /**
@@ -107,6 +112,11 @@ class LoadBalancer {
         return this.load;
     }
 
+    /**
+     * Return the amount of tasks to the client;
+     * 
+     * @param {Number | Optional} id 
+     */
     getDistributionTask(id=0) {
         const type = this.distribution.type;
 
@@ -117,10 +127,14 @@ class LoadBalancer {
         return this.types[type]();
     }
 
-    addHandledTask(task) {
-        this.handledTasks.push(task);
-        
-        return task;
+    /**
+     * Check if the object is empty;
+     * 
+     * @param {Object} object the object;
+     * @param {String} error the error;
+     */
+    validateObject(object, error) {
+        if (!Object.keys(object).length) util.error(error, from);
     }
 }
 

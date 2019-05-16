@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/rug-ds-lab/bsc-2019-in-browser-computing.svg?token=d8egmRZqbNmvN2XPH4z3&branch=master)](https://travis-ci.com/rug-ds-lab/bsc-2019-in-browser-computing)
+
 # Distributed Computing Framework
 Under construction
 
