@@ -1,0 +1,27 @@
+{
+    "manifest_version": 2,
+    "name": "Distributed Browser Computing",
+    "description": "Distributed Browser Computing allows your browser to perform tasks evenly distributed by the server.",
+    "version": "0.1",
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "./js/content.js"
+            ]
+        }
+    ],
+    "background": {
+        "scripts": [
+            "./js/background.js"
+        ],
+        "persistent": false
+    },
+    "browser_action": {
+        "default_icon": "./icons/icon.png",
+        "default_popup": "./html/popup.html",
+        "default_title": "Enable / Diable Distributed Systems"
+    }
+}

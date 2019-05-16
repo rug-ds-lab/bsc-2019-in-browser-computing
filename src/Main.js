@@ -6,7 +6,10 @@
  * TODO: Find a better name.
  */
 
-const Client = require('./Client.js'),
-  Server = require('./Server.js');
+const Client = require('./client/Client.js'),
+      Server = require('./server/Server.js');
 
-module.exports = {Client, Server};
+module.exports = {
+    Client, 
+    Server,
+};

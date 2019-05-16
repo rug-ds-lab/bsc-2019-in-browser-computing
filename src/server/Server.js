@@ -2,7 +2,7 @@
 
 const express = require('express'),
     socketio = require('socket.io'),
-    util = require('./util.js'),
+    util = require('../Utilities.js'),
     ClientManager = require('./ClientManager.js'),
     async = require('async'),
     stream = require('stream'),
