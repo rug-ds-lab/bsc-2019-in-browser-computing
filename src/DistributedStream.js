@@ -4,7 +4,7 @@ const util = require('./Utilities.js'),
     ClientManager = require('./server/ClientManager.js'),
     Server = require('./server/Server.js'),
     DataHandler = require('./DataHandler.js'),
-    Data = require('./Data.js'),
+    express = require('express'),
     stream = require('stream');
 
 class DistributedStream extends stream.Duplex {
@@ -47,12 +47,12 @@ class DistributedStream extends stream.Duplex {
             .on("processed", this._putIntoStream.bind(this));
 
         this.clientManager = new ClientManager()
-            .on("available-client", this._sendJob.bind(this))
             .on("disconnection", this.dataHandler.removeVote.bind(this.dataHandler));
 
         this.server = new Server({httpServer, port})
             .on("connection", this.clientManager.addClient.bind(this.clientManager))
-            .on("result", this.dataHandler.handleResult.bind(this.dataHandler));
+            .on("result", this.dataHandler.handleResult.bind(this.dataHandler))
+            .on("client-available", this._sendJob.bind(this));
 
         // this.loadBalancer = new loadBalancer({}, distribution, []); TODO: Fix this
     }
@@ -97,7 +97,6 @@ class DistributedStream extends stream.Duplex {
         const count = 100; //this.loadBalancer.getDistributionTask(client); //TODO: Make this work
 
         this.dataHandler.getData(client, count, (_err, data) => {
-            this.clientManager.setClientOccupied(client);
             this.server.sendData(client, data);
         });
     }

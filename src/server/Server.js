@@ -1,5 +1,4 @@
 const socketio = require('socket.io'),
-    express = require('express'),
     EventEmitter = require('events'),
     util = require('../Utilities.js');
 
@@ -18,7 +17,10 @@ class Server extends EventEmitter {
 
     start(){
         this.io = socketio(this.httpServer);
-        this.io.on('connection', client => this.emit('connection', client));
+        this.io.on('connection', client => {
+            this.emit('connection', client);
+            this.emit('client-available', client);
+        });
         this.dataSendingRunning = true;
     }
 
@@ -29,8 +31,8 @@ class Server extends EventEmitter {
 
     handleResult(client, datas, results){
         client.data.clear();
+        this.emit('client-available', client);
         datas.forEach((data, i) => this.emit("result", data, results[i]));
-        this.clientManager.setClientFree(client);
     }
 }
 
