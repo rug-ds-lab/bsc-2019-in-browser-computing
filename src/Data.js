@@ -3,7 +3,7 @@ class Data{
     this.data = data;
     this.order = order;
     this.redundancy = redundancy;
-    this.equalityFunction = equalityFunction || ((obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2));
+    this.equalityFunction = equalityFunction;
 
     this.results = []; // objects with data, count keys
     this.voters = []; // clients that are processing/processed this data

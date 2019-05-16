@@ -25,7 +25,9 @@ class ClientManager extends EventEmitter{
    * @param {Socket} client See https://socket.io/docs/server-api/#Socket
    */
   addClient(client){
+    client.data = new Set();
     this.clients.add(client);
+    client.on("disconnect", this.removeClient.bind(this, client));
     this.setClientFree(client);
   }
 
@@ -37,6 +39,7 @@ class ClientManager extends EventEmitter{
   removeClient(client){
     this.clients.delete(client);
     this.freeClients.delete(client);
+    this.emit("disconnection", client);
   }
 
   /**

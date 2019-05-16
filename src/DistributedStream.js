@@ -24,23 +24,37 @@ class DistributedStream extends stream.Duplex {
      *        Can be `adaptive` (default), `single` or `chunk`
      * @param {Number} [opt.distribution.size=100] Chunk sizes for the load distribution if chunk was selected as type
      */
-    constructor({debug=false, port, highWaterMark=100, redundancy=1, equalityFunction, httpServer, distribution}={}) {
+    constructor({
+        debug=false,
+        port=3000,
+        highWaterMark=100,
+        redundancy=1,
+        equalityFunction = ((obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2)),
+        httpServer=express().listen(this.port),
+        distribution={type:"adaptative", size:100}
+        }={}) {
+
         super({objectMode: true, highWaterMark: highWaterMark});
 
         this.debug = debug;
 
         this.backPressure = true; // don't start sending jobs until _read is called
+
         /** count of data pieces written to the stream */
         this.writtenCount = 0;
 
-        this.clientManager = new ClientManager()
-            .on("available-client", this._sendJob.bind(this));
         this.dataHandler = new DataHandler({equalityFunction, redundancy})
             .on("processed", this._putIntoStream.bind(this));
-        this.server = new Server({httpServer, port, clientManager:this.clientManager, dataHandler: this.dataHandler})
-            .on("disconnect", this.dataHandler.removeVote.bind(this.dataHandler))
+
+        this.clientManager = new ClientManager()
+            .on("available-client", this._sendJob.bind(this))
+            .on("disconnection", this.dataHandler.removeVote.bind(this.dataHandler));
+
+        this.server = new Server({httpServer, port})
+            .on("connection", this.clientManager.addClient.bind(this.clientManager))
             .on("result", this.dataHandler.handleResult.bind(this.dataHandler));
-        // this.loadBalancer = new loadBalancer({}, distribution, []);
+
+        // this.loadBalancer = new loadBalancer({}, distribution, []); TODO: Fix this
     }
 
     /**
