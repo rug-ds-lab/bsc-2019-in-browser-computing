@@ -1,8 +1,7 @@
 'use strict';
 
 const io = require('socket.io-client'),
-      util = require('../Utilities.js'),
-      async = require('async');
+      util = require('../Utilities.js');
 
 class Client {
     /**
@@ -41,14 +40,11 @@ class Client {
         // Run the work function whenever data is received
         socket.on('data', (data, callback) => {
             util.debug(that.debug, `Received data from the host: ${JSON.stringify(data)}`);
-            async.map(data, that.workFunction, (err, result) => {
-                if(err){
-                    throw err;
-                }
+            const results = data.map(that.workFunction);
 
-                callback(result);
-                util.debug(that.debug, `Sent result to the host: ${JSON.stringify(result)}`);
-            });
+            util.debug(that.debug, `Sent result to the host: ${JSON.stringify(results)}`);
+
+            return callback(results);
         });
     }
 }

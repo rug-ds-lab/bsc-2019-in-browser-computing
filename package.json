@@ -1,17 +1,15 @@
 {
-  "name": "Pegasus",
+  "name": "distributed-stream",
   "version": "0.0.1",
   "description": "Distributed Browser computing framework",
   "scripts": {
-    "server": "cd examples/basic && node basic-server.js",
-    "client": "cd examples/basic && node basic-client.js",
-    "test": "cd src/tests && node Test.js"
+    "test": "cd src/tests && node Test.js",
+    "build": ""
   },
   "author": "George Argyrousis & Tolga Parlan",
   "license": "MIT Groningen",
   "homepage": "https://github.com/rug-ds-lab/bsc-2019-in-browser-computing",
   "dependencies": {
-    "async": "^2.6.2",
     "event-stream": "^4.0.1",
     "express": "^4.16.4",
     "socket.io": "^2.2.0"

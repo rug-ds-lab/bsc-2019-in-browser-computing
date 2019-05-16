@@ -53,7 +53,7 @@ class ClientManager extends EventEmitter{
    */
   setClientFree(client){
     this.freeClients.add(client);
-    this.emit("Client Available");
+    this.emit("available-client", client);
   }
 
   setClientOccupied(client){
