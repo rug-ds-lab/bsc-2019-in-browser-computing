@@ -1,15 +1,19 @@
 const socketio = require('socket.io'),
-express = require('express');
+    express = require('express'),
+    EventEmitter = require('events'),
+    util = require('../Utilities.js');
 
-class Server{
+class Server extends EventEmitter {
     constructor({httpServer, port, clientManager}){
+        super();
+
         this.port = port || 3000;
         this.httpServer = httpServer || express().listen(this.port);
-        this.clientManager = clientManager;
+        this.clientManager = clientManager; //TODO: Maybe remove this and communicate with events through the stream?
         
         this.dataSendingRunning = false;
-        this.allDataHasBeenProcessed = false; // TODO: Replace with a call to the server?
-        
+        this.allDataHasBeenProcessed = false;
+
         this.start();
     }
 
@@ -32,14 +36,14 @@ class Server{
 
     sendData(client, datas){
         const strippedData = datas.map(data => data.data);
-        client.emit("data", strippedData, this.handleResult.bind(this, client, datas));
+        client.emit("data", strippedData, this.handledataHandler.handleResult.bind(this, client, datas));
     }
 
     handleResult(client, datas, results){
-        util.debug(this.debug, "Received result");
+        // util.debug(true, "Received result");
 
-        client.data.length = 0; // https://stackoverflow.com/questions/1232040/how-do-i-empty-an-array-in-javascript
-        datas.forEach((data, i) => this.dataSendingRunning(client, data, results[i]));
+        client.data.clear();
+        datas.forEach((data, i) => this.emit("result", data, results[i])); //TODO: Better way?
         this.clientManager.setClientFree(client);
     }
 }

@@ -1,11 +1,11 @@
 'use strict';
 
-const util = require('./util.js'),
-    ClientManager = require('./ClientManager.js'),
-    stream = require('stream'),
-    Data = require('./Data.js'),
+const util = require('./Utilities.js'),
+    ClientManager = require('./server/ClientManager.js'),
     Server = require('./server/Server.js'),
     DataHandler = require('./DataHandler.js'),
+    Data = require('./Data.js'),
+    stream = require('stream');
 
 class DistributedStream extends stream.Duplex {
 
@@ -28,8 +28,6 @@ class DistributedStream extends stream.Duplex {
         super({objectMode: true, highWaterMark: highWaterMark});
 
         this.debug = debug;
-        this.redundancy = redundancy;
-        this.equalityFunction = equalityFunction || ((obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2));
 
         this.backPressure = true; // don't start sending jobs until _read is called
         /** count of data pieces written to the stream */
@@ -37,11 +35,12 @@ class DistributedStream extends stream.Duplex {
 
         this.clientManager = new ClientManager()
             .on("available-client", this._sendJob.bind(this));
-        this.dataHandler = new DataHandler();
+        this.dataHandler = new DataHandler({equalityFunction, redundancy})
+            .on("processed", this._putIntoStream.bind(this));
         this.server = new Server({httpServer, port, clientManager:this.clientManager, dataHandler: this.dataHandler})
             .on("disconnect", this.dataHandler.removeVote.bind(this.dataHandler))
-            .on("processed", this._putIntoStream.bind(this));
-        this.loadBalancer = new loadBalancer({}, distribution, []);
+            .on("result", this.dataHandler.handleResult.bind(this.dataHandler));
+        // this.loadBalancer = new loadBalancer({}, distribution, []);
     }
 
     /**
@@ -57,12 +56,7 @@ class DistributedStream extends stream.Duplex {
      * Called by the stream implementation when new data is written into this stream.
      */
     _write(data, _encoding, callback){
-        this.dataHandler.addData(new Data({
-            data,
-            order: this.counts.read,
-            redundancy: this.redundancy,
-            equalityFunction: this.equalityFunction
-        }));
+        this.dataHandler.addData(data);
         callback();
     }
 
@@ -71,7 +65,7 @@ class DistributedStream extends stream.Duplex {
      * @param {Function} callback 
      */
     _final(callback){
-        this.dataHandler.allDataHasBeenRead();
+        this.dataHandler.endOfData();
         callback();
     }
 
@@ -86,7 +80,7 @@ class DistributedStream extends stream.Duplex {
             return this.once("resume", this._sendJob.bind(this, client));
         }
 
-        const count = this.loadBalancer.getDistributionTask(client); //TODO: Make this work
+        const count = 100; //this.loadBalancer.getDistributionTask(client); //TODO: Make this work
 
         this.dataHandler.getData(client, count, (_err, data) => {
             this.clientManager.setClientOccupied(client);

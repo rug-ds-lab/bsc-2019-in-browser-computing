@@ -1,5 +1,12 @@
-class DataHandler{
-    constructor(){
+const EventEmitter = require('events'),
+    Data = require('./Data.js');
+
+class DataHandler extends EventEmitter {
+    constructor({equalityFunction, redundancy}){
+        super();
+
+        this.equalityFunction = equalityFunction;
+        this.redundancy = redundancy;
 
         /**
          * Counters for data pieces that are:
@@ -12,7 +19,7 @@ class DataHandler{
             processed: 0
         }
 
-        this.allDataHasBeenRead: false;
+        this.allDataHasBeenRead = false;
 
         /**
          * Buffers for data pieces that:
@@ -31,12 +38,17 @@ class DataHandler{
     }
 
     addData(data){
-        this.dataBuffers.canBeSent.add(data);
+        this.dataBuffers.canBeSent.add(new Data({
+            data,
+            order: this.counts.read,
+            redundancy: this.redundancy,
+            equalityFunction: this.equalityFunction
+        }));
         this.counts.read++;
         this.emit("new-data");
     }
 
-    allDataHasBeenRead(){
+    endOfData(){
         // Put null at the end so that this eventually closes the stream
         this.dataBuffers.processed.set(this.counts.read, null);
     }
@@ -50,7 +62,7 @@ class DataHandler{
         });
     }
 
-    handleResult(client, data, result){
+    handleResult(data, result){
         data.addResult(result);
 
         // if done with processing this piece, move it to the processed buffer
@@ -76,7 +88,7 @@ class DataHandler{
      *        of raw data pieces *NOT* Data objects.
      */
     getData(client, count, callback){
-        const datas = Array.from(this.dataBuffers.canBeSent.values()).filter((data) => data.canVote(client));
+        const datas = Array.from(this.dataBuffers.canBeSent.values()).filter((data) => data.canVote(client)).slice(0, count);
 
         if(datas.length){
             datas.forEach((data) => {
@@ -89,7 +101,7 @@ class DataHandler{
                 }
             });
 
-            return callback(null, datas.slice(0, count));
+            return callback(null, datas);
         }
 
         this.once("new-data", this.getData.bind(this, client, count, callback));
