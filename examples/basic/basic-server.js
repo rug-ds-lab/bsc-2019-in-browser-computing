@@ -13,7 +13,7 @@ const httpServer = app.listen(port, () => console.log(`Listening on ${port}!`));
 
 // Stream constructed from a function that simply counts from 0 till 5000
 const numberStream = es.readable(function(i, callback)  {
-  if(i > 5000){
+  if(i > 500000){
     return this.emit('end')
   }
   return callback(null, i.toString());

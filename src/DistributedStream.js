@@ -4,6 +4,7 @@ const util = require('./Utilities.js'),
     ClientManager = require('./server/ClientManager.js'),
     Server = require('./server/Server.js'),
     DataHandler = require('./DataHandler.js'),
+    LoadBalancer = require('./server/loadDistribution/LoadBalancer.js'),
     express = require('express'),
     stream = require('stream');
 
@@ -31,7 +32,7 @@ class DistributedStream extends stream.Duplex {
         redundancy=1,
         equalityFunction = ((obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2)),
         httpServer=express().listen(this.port),
-        distribution={type:"adaptative", size:100}
+        distribution={type:"adaptive", size:100}
         }={}) {
 
         super({objectMode: true, highWaterMark: highWaterMark});
@@ -49,12 +50,13 @@ class DistributedStream extends stream.Duplex {
         this.clientManager = new ClientManager()
             .on("disconnection", this.dataHandler.removeVote.bind(this.dataHandler));
 
+        this.loadBalancer = new LoadBalancer(this.clientManager, distribution);
+
         this.server = new Server({httpServer, port})
+            .on("connection", this.loadBalancer.initializeClient.bind(this.loadBalancer))
             .on("connection", this.clientManager.addClient.bind(this.clientManager))
             .on("result", this.dataHandler.handleResult.bind(this.dataHandler))
             .on("client-available", this._sendJob.bind(this));
-
-        // this.loadBalancer = new loadBalancer({}, distribution, []); TODO: Fix this
     }
 
     /**
@@ -94,7 +96,7 @@ class DistributedStream extends stream.Duplex {
             return this.once("resume", this._sendJob.bind(this, client));
         }
 
-        const count = 100; //this.loadBalancer.getDistributionTask(client); //TODO: Make this work
+        const count = this.loadBalancer.getTaskSize(client);
 
         this.dataHandler.getData(client, count, (_err, data) => {
             this.server.sendData(client, data);
