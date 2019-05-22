@@ -1,2 +1,37 @@
 \chapter{Related Work}
-% Talk about why other projects aren't very successfull
+As mentioned previously, the concept of a distributed system that uses other, previously unknown computers as nodes through running code on their web browsers and communicates with them over internet is nothing new. There have been many attempts at creating such distributed networks, with different approaches, architectures and aims. Here we give a quick breakdown of the past projects that this project has directly or indirectly benefited from. We also attempt an investigation of why browser based distributed computing projects haven't caught on popularity-wise, and speculate how our architecture may provide a more practical alternative.
+
+We follow the three generation system proposed in \citep{fabisiak2017browser}, and concern ourselves mainly with what they define as the \textbf{Third Generation}. This generation is distinct from the previous ones because of the new Javascript features it can benefit from (and the fact that Javascript is used instead of Java applets) such as a fast compiler, thread support (via WebWorkers) and Websockets. The reason for this is our project highly resembles most other such examples in terms of the tech stack, and thus they are the most relevant examples we can use to examine how to improve current systems.
+
+% Mention important projects with quick summaries
+\section*{QMachine \cite{wilkinson2014qmachine}}
+QMachine is an up and running implementation of the distributing jobs to browser clients idea. It has three different components: \textbf{browsers} which do the actual computations and submit new computations, an \textbf{API Server} which receives computation requests from the browsers and distributes these computations to other, available browsers. Also a \textbf{Web Server} is needed to serve the initial code to the browser clients. The API Server should be installed and ran individually by the user who wants to create a network for their own purposes, and it can use only a given set of databases with pre-implemented integrations. The author assumes that QM will be used by closed scientific groups who will then invite only trusted volunteers, thus the main security feature involved is verifying the participants are indeed only the trusted volunteers. The communication between the API server and the browsers use plain AJAX requests to submit jobs to the server, and to poll the server for new jobs. The QM class written by the authors can be used as outside of a browser as well, using Node.js.
+
+Judging from its github activity, npm downloads and how long it took for another user to connect to its main API Server and process basic test jobs submitted by us, the project doesn't seem very alive. We suspect several factors contributed to this relative inactivity. 
+\begin{itemize}
+	\item It is not clear how this system would generalize to open internet, given its lack of any sabotage-tolerance features. In an environment where not everyone is a trusted volunteer as assumed by the system, one browser busying up the network with very large jobs or sending wrongly calculated results back would easily sabotage the computation. Distributing computational tasks makes sense practical only if there is an abundance of computing nodes. However a system in which only trusted volunteers can participate is severely limited in scalability.
+	\item The system has little flexibility in how the computed data is later on stored or handled. The computed data has to be stored on a database, and the API Server owner needs to provide a database system already supported by the QMachine. This imposes an unnecessary limitation for what sort of use cases this system can be used.
+	\item MAYBE MENTION POLLING DISADVANTAGES
+\end{itemize}
+We speculate that these factors stop the system from being viable in most practical scenarios. However the project definitely presents useful ideas such as having a separate server running the distributed system independently of any other web server. We think that this modularity is very important for easy integration into any other project. Furthermore packaging the client code so that it can simply be a part of any web page helps in this aspect too.
+
+\section*{MRJS \cite{ryza2010mrjs}}
+MRJS is one of many projects inspired by Google's popular Map-Reduce architecture \cite{62}, intending to move this type of task distribution into the browsers. Map-Reduce paradigm is useful in a broad range of computational tasks, and has the side-advantage that the it presents a very high level and intuitive interface for the programmers to interact with, hiding away details that would require experience with distributed systems to understand. MRJS also aims to give job creators control over parameters that might affect performance. The idea of hiding the distribution details from the programmer who is using the system, while giving optional access to parameters related to performance is a principle we have tried to adhere to in our program as well. [WRITE MORE]
+
+\section*{MLtiB}
+WRITE THIS
+
+\section*{Summary[BETTER NAME?]}
+A common problem that is introduced by using browsers as the computation medium for a distributed network is convincing the users to visit the relevant website and stay there. This is a problem that earlier projects such SETI@HOME [CITE] or BOINC did not face, since in these projects volunteer download and install a program which then runs in the background. In contrast, computation stops when a tab is closed in a browser. We think that the common design approaches usually do not help with this problem. [TALK ABOUT LOW PARTICIPANT NUMBERS]. 
+%There are two common approaches on how to get a user to participate on a task. Some systems [CITE] envision a marketplace of distributed tasks, from which a user chooses one to participate. 
+
+
+% Mention their architectures, similar and dissimilar points
+
+% Talk about why other projects aren't very successfull - Browser Based Harnessing paper (23)
+
+% talk about gray computing projects?
+
+% Discuss what sort of decisions we have made to avoid similar problems
+
+% Also talk about fault-tolerance and load balancing papers? or maybe do that later?
