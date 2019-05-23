@@ -1,10 +1,13 @@
 \chapter{Related Work}
 As mentioned previously, the concept of a distributed system that uses other, previously unknown computers as nodes through running code on their web browsers and communicates with them over internet is nothing new. There have been many attempts at creating such distributed networks, with different approaches, architectures and aims. Here we give a quick breakdown of the past projects that this project has directly or indirectly benefited from. We also attempt an investigation of why browser based distributed computing projects haven't caught on popularity-wise, and speculate how our architecture may provide a more practical alternative.
 
-We follow the three generation system proposed in \citep{fabisiak2017browser}, and concern ourselves mainly with what they define as the \textbf{Third Generation}. This generation is distinct from the previous ones because of the new Javascript features it can benefit from (and the fact that Javascript is used instead of Java applets) such as a fast compiler, thread support (via WebWorkers) and Websockets. The reason for this is our project highly resembles most other such examples in terms of the tech stack, and thus they are the most relevant examples we can use to examine how to improve current systems.
+We follow the three generation paradigm proposed in \cite{fabisiak2017browser}, and concern ourselves mainly with what they define as the \textbf{Third Generation}. This generation is distinct from the previous ones because of the new Javascript features it can benefit from (and the fact that Javascript is used instead of Java applets) such as a fast compiler, thread support (via WebWorkers) and WebSockets. The reason for this is our project highly resembles most other such examples in terms of the tech stack, and thus they are the most relevant examples we can use to examine how to improve current systems. 
+We also mention only projects that are meant for general use and aren't simply prototypes or benchmark platforms.
+After we examine several projects, we delve into arguing about the major problems such projects faced and what direction can be taken in the future to avoid them. Later we briefly mention the Map-Reduce paradigm which has been influential in our approach.
 
 % Mention important projects with quick summaries
-\section*{QMachine \cite{wilkinson2014qmachine}}
+\section{Similar Projects}
+\subsection{QMachine \cite{wilkinson2014qmachine}}
 QMachine is an up and running implementation of the distributing jobs to browser clients idea. It has three different components: \textbf{browsers} which do the actual computations and submit new computations, an \textbf{API Server} which receives computation requests from the browsers and distributes these computations to other, available browsers. Also a \textbf{Web Server} is needed to serve the initial code to the browser clients. The API Server should be installed and ran individually by the user who wants to create a network for their own purposes, and it can use only a given set of databases with pre-implemented integrations. The author assumes that QM will be used by closed scientific groups who will then invite only trusted volunteers, thus the main security feature involved is verifying the participants are indeed only the trusted volunteers. The communication between the API server and the browsers use plain AJAX requests to submit jobs to the server, and to poll the server for new jobs. The QM class written by the authors can be used as outside of a browser as well, using Node.js.
 
 Judging from its github activity, npm downloads and how long it took for another user to connect to its main API Server and process basic test jobs submitted by us, the project doesn't seem very alive. We suspect several factors contributed to this relative inactivity. 
@@ -14,24 +17,46 @@ Judging from its github activity, npm downloads and how long it took for another
 	\item MAYBE MENTION POLLING DISADVANTAGES
 \end{itemize}
 We speculate that these factors stop the system from being viable in most practical scenarios. However the project definitely presents useful ideas such as having a separate server running the distributed system independently of any other web server. We think that this modularity is very important for easy integration into any other project. Furthermore packaging the client code so that it can simply be a part of any web page helps in this aspect too.
+[TALK ABOUT THEIR USER NUMBERS]
 
-\section*{MRJS \cite{ryza2010mrjs}}
+\subsection{MLitB \cite{meeds2015mlitb}}
+MLtiB, Machine Learning in the Browser is a prototype Machine Learning that is intended to provide an easy platform for researchers to run their machine learning jobs on, using the computing power provided by volunteers. When users connect to the system, they interact with a UI from which they can create workers (which are implemented as WebWorkers) to perform various tasks. The system relies on the assumption that the contributors will voluntarily go to a web page intended for machine learning  and create these workers. After the initial transfer of data (which is compressed to speed up this transfer), all communication happens through WebSockets. They have two servers, one for distributing data and another master server for coordinating the process. Both of them are written in Node.js, and the authors justify this design decision with the event-driven and lightweight architecture of Node.js servers: "Since the main computational load is carried by the clients, and not the server, a light-weight server that can handle many clients concurrently is all that is required by MLitB." They have been influenced by the Map-Reduce paradigm and use it for their machine learning algorithms.
+
+use of websockets and webworkers good
+node arguments good
+The separate UI might not be good user retention
+
+
+\section{Common Problems}
+\subsection{User Retention}
+A common problem that is introduced by using browsers as the computation medium for a distributed network is convincing the users to visit the relevant website and stay there. This is a problem that earlier projects such SETI@HOME [CITE] or BOINC did not face, since in these projects volunteer download and install a program which then runs in the background. In contrast, computation stops when a tab is closed in a browser. We think that the common design approaches usually do not help with this problem. 
+
+A broad survey on the state of Browser Based Voluntary Computing by Fabisiak \& Danilecki (2017) concludes that "the problem of recruiting the users is the most important challenge faced by browser-based platforms". One common theme amongst all the projects they have inspected is either a very low number of volunteers, or the numbers not being reported at all. In the paper the authors suggest that incentive systems employed by older generations of voluntary computing systems, such as reputation systems, virtual credits or real monetary awards based on computing power contributions could to some degree be adapted to the newer systems. However this suggestion in our opinion ignores one of the most important properties of browser based systems. Browser based systems present a much lower barrier of entry than installing a program on one's computer, however this property brings a lot much higher retention rates, with most users not contributing more than once [CITE NUMBERS]. This is rather understandable when an average internet surf routine is inspected. Browser tabs are designed to be easily disposable and many users open and close plenty of tabs routinely. Getting a user to keep a tab open for a meaningful amounts of time, and routinely come back is difficult and we suspect most projects fail at this, even when they have successfully attract a decent number of contributors initially such as QMachine. 
+
+We think that gray computing practices can be a solution to the aforementioned user retention problem. It has proven difficult to attract volunteers, who would spend meaningful amounts of time, we think a decent solution would be to embed such systems in already popular websites with which users engage for a long time. Thus we have strived to make our system easily adaptable into any enot contributing more than once [CITE NUMBERS]. This is rather understandable when an average internet surf routine is inspected. Browser tabs are designed to be easily disposable and many users open and close plenty of tabs routinely. Getting a user to keep a tab open for a meaningful amounts of time, and routinely come back is difficult and we suspect mostxisting website with adding only a small script to the client-side code and keeping the server implementation as simple as possible. 
+
+\subsection{Server Adaptability}
+We have observed that many projects in the field of Browser Based Volunteer Computing are done with one sort of calculation in mind. Apart from MLitB examined before, most other projects we have examined such as Zorrilla et al. (2013) \cite{zorrilla2013web} with their social networking emphasis, Krupa et al. (2012) \cite{krupa2012demand} with their investigation limited to web search, Duda \& Dlubcaz (2012) \cite{duda2012distributed} targeting only evaluationary algorithms and so forth. While the investigative value of these papers are indisputable, they are not really adaptable to many other purposes. 
+
+A similar problem that arises from this problem-centric approach is that the program architectures aren't built with much modularity. This is a common theme that might be harming the adaptability of the projects to different environments, as trying to provide a Swiss army knife solution, which attempts to be very simple to use by providing as many as features as possible is not necessarily the best software development approach. [GIVE EXAMPLES]. 
+This is understandable since many projects have other scientists working on diverse fields who might need computing power to run their calculations on. However this often leads to projects that are rather complicated, bloated and possible bug-prone [GIVE EXAMPLES]. As projects grow and get more complicated, it becomes increasingly more difficult to adapt for other users, and maintain for the initial creators. 
+For example a user of the QMachine system who doesn't want to persist the data in one of the presented database options is going to have to employ some software hacks. Someone who would like to use their own servers cannot run the MLitB system since it requires its own data and machine learning servers to be used.
+
+\subsection{Performance}
+Langhans et al. \cite{langhans2013crowdsourcing}, embed their Map-Reduce solution doing large calculations in the back-ground while the user is busy playing a short browser game, and then survey the users. In their survey, "no user reported effects of the massive calculations in the background on the game application in the foreground. (...) Concerning allowing additional calculations in the background only 15\% of the users raised doubts but none rejected the idea". They explain this by WebWorkers moving the calculations to the background effectively. Indeed we agree that the WebWorker technology makes gray computing running background tasks much more feasible for websites that do not want the user experience to take a hit. A set of projects that we have gone over such as [FIND EXAMPLES] do not use the WebWorkers technology, making them difficult to adapt in situations where web surfing quality of the users is a consideration. WebWorkers is currently supported in every single major desktop or mobile browser (LINK) and we have implemented them in our project as well.
+%https://caniuse.com/#search=webworker
+
+\subsubsection{Bottlenecks}
+TALK ABOUT Server being the bottleneck, the need for an efficient server implementation, advantages of NODEJS and streams
+
+Maybe also about http calls being slow, and using sockets instead?
+
+\section{Map-Reduce}
+\subsection{MRJS \cite{ryza2010mrjs}}
 MRJS is one of many projects inspired by Google's popular Map-Reduce architecture \cite{62}, intending to move this type of task distribution into the browsers. Map-Reduce paradigm is useful in a broad range of computational tasks, and has the side-advantage that the it presents a very high level and intuitive interface for the programmers to interact with, hiding away details that would require experience with distributed systems to understand. MRJS also aims to give job creators control over parameters that might affect performance. The idea of hiding the distribution details from the programmer who is using the system, while giving optional access to parameters related to performance is a principle we have tried to adhere to in our program as well. [WRITE MORE]
-
-\section*{MLtiB}
-WRITE THIS
-
-\section*{Summary[BETTER NAME?]}
-A common problem that is introduced by using browsers as the computation medium for a distributed network is convincing the users to visit the relevant website and stay there. This is a problem that earlier projects such SETI@HOME [CITE] or BOINC did not face, since in these projects volunteer download and install a program which then runs in the background. In contrast, computation stops when a tab is closed in a browser. We think that the common design approaches usually do not help with this problem. [TALK ABOUT LOW PARTICIPANT NUMBERS]. 
-%There are two common approaches on how to get a user to participate on a task. Some systems [CITE] envision a marketplace of distributed tasks, from which a user chooses one to participate. 
-
-
-% Mention their architectures, similar and dissimilar points
-
-% Talk about why other projects aren't very successfull - Browser Based Harnessing paper (23)
+% Mention how we are inspired by the map-reduce
+ALSO THE OTHER MAP REDUCE JS
 
 % talk about gray computing projects?
-
-% Discuss what sort of decisions we have made to avoid similar problems
 
 % Also talk about fault-tolerance and load balancing papers? or maybe do that later?
