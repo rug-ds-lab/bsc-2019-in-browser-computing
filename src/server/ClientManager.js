@@ -10,7 +10,6 @@ class ClientManager extends EventEmitter{
 
   constructor(){
     super();
-
     this.clients = new Set();
   }
 

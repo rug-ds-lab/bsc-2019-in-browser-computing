@@ -97,7 +97,6 @@ class DistributedStream extends stream.Duplex {
         const count = 100; //this.loadBalancer.getDistributionTask(client); //TODO: Make this work
 
         this.dataHandler.getData(client, count, (_err, data) => {
-            this.clientManager.setClientOccupied(client);
             this.server.sendData(client, data);
         });
     }
