@@ -1,23 +1,16 @@
-const socketio = require('socket.io'),
-    EventEmitter = require('events'),
+const EventEmitter = require('events'),
     util = require('../Utilities.js');
 
 class Server extends EventEmitter {
-    constructor({httpServer, port}){
+    constructor({socket, port}){
         super();
 
         this.port = port;
-        this.httpServer = httpServer;
         
         this.dataSendingRunning = false;
         this.allDataHasBeenProcessed = false;
 
-        this.start();
-    }
-
-    start(){
-        this.io = socketio(this.httpServer);
-        this.io.on('connection', client => {
+        socket.on('connection', client => {
             this.emit('connection', client);
             this.emit('client-available', client);
         });

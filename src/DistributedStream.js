@@ -5,7 +5,6 @@ const util = require('./Utilities.js'),
     Server = require('./server/Server.js'),
     DataHandler = require('./DataHandler.js'),
     LoadBalancer = require('./server/loadDistribution/LoadBalancer.js'),
-    express = require('express'),
     stream = require('stream');
 
 class DistributedStream extends stream.Duplex {
@@ -17,12 +16,11 @@ class DistributedStream extends stream.Duplex {
      * @param {Number} [opt.highWaterMark=100] Maximum number of data batches to put into the stream at once
      * @param {Number} [opt.redundancy=1] Redundancy factor used for the voting algorithm. Defaults to no redundancy
      * @param {Function} [opt.equalityFunction] The function used to compare if two results are the same
-     * @param {http.Server} [httpServer] The http server instance to use. If not given, a new express server will listen
-     *        at the given opt.port
+     * @param {Server} [socket] https://socket.io/docs/server-api/#Server
      * @param {Number} [opt.port=3000] Effective only if no opt.httpServer is passed.
      * @param {Object} [opt.distribution] The type of load distribution requested;
-     * @param {String} [opt.distribution.type="adaptive"] The type of load distribution server should provide.
-     *        Can be `adaptive` (default), `single` or `chunk`
+     * @param {String} [opt.distribution.type="chunk"] The type of load distribution server should provide.
+     *        Can be `adaptive`, `single` or `chunk` (default)
      * @param {Number} [opt.distribution.size=100] Chunk sizes for the load distribution if chunk was selected as type
      */
     constructor({
@@ -31,11 +29,15 @@ class DistributedStream extends stream.Duplex {
         highWaterMark=100,
         redundancy=1,
         equalityFunction = ((obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2)),
-        httpServer=express().listen(this.port),
-        distribution={type:"adaptive", size:100}
+        socket,
+        distribution={type:"chunk", size:100}
         }={}) {
 
         super({objectMode: true, highWaterMark: highWaterMark});
+
+        if(!socket){
+            throw new Error('socket is required');
+        }
 
         this.debug = debug;
 
@@ -52,7 +54,7 @@ class DistributedStream extends stream.Duplex {
 
         this.loadBalancer = new LoadBalancer(this.clientManager, distribution);
 
-        this.server = new Server({httpServer, port})
+        this.server = new Server({socket, port})
             .on("connection", this.loadBalancer.initializeClient.bind(this.loadBalancer))
             .on("connection", this.clientManager.addClient.bind(this.clientManager))
             .on("result", this.dataHandler.handleResult.bind(this.dataHandler))
