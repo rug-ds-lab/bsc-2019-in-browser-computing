@@ -16,8 +16,6 @@ class LoadBalancer {
         // this.validateObject(distribution, 'Type is an empty object');
         this.distribution = distribution;
 
-        // this.averageResponseTime = 0; // TODO: Make an updating mechanism
-
         /**
          * Distribute an array of tasks to the client;
          * 
@@ -63,7 +61,6 @@ class LoadBalancer {
 
     /**
      * Compute the average response time of all clients;
-     * TODO: Make this update everytime a result comes in, instead of going over everything all the time
      * @returns {Number} 
      */
     averageResponseTime() {
