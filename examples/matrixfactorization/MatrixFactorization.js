@@ -8,8 +8,8 @@ class MatrixFactorization {
     constructor() {
       this.userCount = 100;
       this.movieCount = 80;
-      this.featureCount = 30;
-      this.workerCount = 2;
+      this.featureCount = 50;
+      this.workerCount = 5;
 
       this.ratings = DataProvider.generateRandomSparseData(0.6, this.movieCount, this.userCount);
 

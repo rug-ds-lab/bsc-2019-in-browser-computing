@@ -15,6 +15,8 @@ class ParameterStream extends stream.Writable {
       this.MF.H.updateSubset(data['H_partition']);
 
       this.lastPartition = data.partition;
+      // console.log(this.lastPartition);
+
       // current timestep is all processed
       if(this.isTimestepDone()) {
         this.emit("new timestep");
