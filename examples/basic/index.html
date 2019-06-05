@@ -42,17 +42,17 @@
         };
 
         const workFunction = async (data) => {
-            // if (worker) {
-            //     let workerResponse = null;
+            if (worker) {
+                let workerResponse = null;
 
-            //     await workerPromise(data).then(({ data }) => {
-            //         workerResponse = data;
-            //     });
+                await workerPromise(data).then(({ data }) => {
+                    workerResponse = data;
+                });
                 
-            //     if (workerResponse !== null) {
-            //         return workerResponse;
-            //     }
-            // }
+                if (workerResponse !== null) {
+                    return workerResponse;
+                }
+            }
             
             return findPrimeFactors(data);
         };

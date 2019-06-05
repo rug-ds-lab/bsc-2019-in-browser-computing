@@ -40,10 +40,11 @@ class Client {
         // Run the work function whenever data is received
         socket.on('data', (data, callback) => {
             util.debug(that.debug, `Received data from the host: ${JSON.stringify(data)}`);
-            const results = that.workFunction(data);
-            util.debug(that.debug, `Sent result to the host: ${JSON.stringify(results)}`);
+            that.workFunction(data).then((response) => {
+                util.debug(that.debug, `Sent result to the host: ${JSON.stringify(response)}`);
 
-            return callback(results);
+                return callback(response);
+            });
         });
     }
 }
