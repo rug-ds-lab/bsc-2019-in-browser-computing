@@ -1,7 +1,7 @@
 /**
  * {Object} - data
  */
-self.onmessage = ({data}) => {
+self.onmessage = ({ data }) => {
     postMessage(data.size === 0 ?
         'terminate'
     :

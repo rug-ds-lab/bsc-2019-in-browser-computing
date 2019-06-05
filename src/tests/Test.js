@@ -1,7 +1,7 @@
 'use strict';
 
 const LoadBalancer = require('../server/loadDistribution/LoadBalancer.js');
-const {assert, nextInt} = require('../Utilities.js');
+const { assert, nextInt } = require('../Utilities.js');
 
 const generateRandomClients = (seed=10) => {
     const types = ['single', 'chunk', 'adjustable'];

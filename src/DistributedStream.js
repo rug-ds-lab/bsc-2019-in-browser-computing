@@ -2,8 +2,8 @@
 
 const ClientManager = require('./server/ClientManager.js'),
     Server = require('./server/Server.js'),
-    DataHandler = require('./DataHandler.js'),
-    Data = require('./Data.js'),
+    DataHandler = require('./server/DataHandler.js'),
+    LoadBalancer = require('./server/LoadBalancer.js'),
     stream = require('stream');
 
 class DistributedStream extends stream.Duplex {
@@ -15,12 +15,11 @@ class DistributedStream extends stream.Duplex {
      * @param {Number} [opt.highWaterMark=100] Maximum number of data batches to put into the stream at once
      * @param {Number} [opt.redundancy=1] Redundancy factor used for the voting algorithm. Defaults to no redundancy
      * @param {Function} [opt.equalityFunction] The function used to compare if two results are the same
-     * @param {http.Server} [httpServer] The http server instance to use. If not given, a new express server will listen
-     *        at the given opt.port
+     * @param {Server} [socket] https://socket.io/docs/server-api/#Server
      * @param {Number} [opt.port=3000] Effective only if no opt.httpServer is passed.
      * @param {Object} [opt.distribution] The type of load distribution requested;
-     * @param {String} [opt.distribution.type="adaptive"] The type of load distribution server should provide.
-     *        Can be `adaptive` (default), `single` or `chunk`
+     * @param {String} [opt.distribution.type="chunk"] The type of load distribution server should provide.
+     *        Can be `adaptive`, `single` or `chunk` (default)
      * @param {Number} [opt.distribution.size=100] Chunk sizes for the load distribution if chunk was selected as type
      */
     constructor({
@@ -29,11 +28,15 @@ class DistributedStream extends stream.Duplex {
         highWaterMark=100,
         redundancy=1,
         equalityFunction = ((obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2)),
-        httpServer=express().listen(this.port),
-        distribution={type:"adaptative", size:100}
+        socket,
+        distribution={type:"chunk", size:100}
         }={}) {
 
         super({objectMode: true, highWaterMark: highWaterMark});
+
+        if(!socket){
+            throw new Error('socket is required');
+        }
 
         this.debug = debug;
 
@@ -47,14 +50,15 @@ class DistributedStream extends stream.Duplex {
             .on("processed", this._putIntoStream.bind(this));
 
         this.clientManager = new ClientManager()
-            .on("available-client", this._sendJob.bind(this))
             .on("disconnection", this.dataHandler.removeVote.bind(this.dataHandler));
 
-        this.server = new Server({httpServer, port})
-            .on("connection", this.clientManager.addClient.bind(this.clientManager))
-            .on("result", this.dataHandler.handleResult.bind(this.dataHandler));
+        this.loadBalancer = new LoadBalancer(this.clientManager, distribution);
 
-        // this.loadBalancer = new loadBalancer({}, distribution, []); TODO: Fix this
+        this.server = new Server({socket, port})
+            .on("connection", this.loadBalancer.initializeClient.bind(this.loadBalancer))
+            .on("connection", this.clientManager.addClient.bind(this.clientManager))
+            .on("result", this.dataHandler.handleResult.bind(this.dataHandler))
+            .on("client-available", this._sendJob.bind(this));
     }
 
     /**
@@ -94,7 +98,7 @@ class DistributedStream extends stream.Duplex {
             return this.once("resume", this._sendJob.bind(this, client));
         }
 
-        const count = 100; //this.loadBalancer.getDistributionTask(client); //TODO: Make this work
+        const count = this.loadBalancer.getTaskSize(client);
 
         this.dataHandler.getData(client, count, (_err, data) => {
             this.server.sendData(client, data);

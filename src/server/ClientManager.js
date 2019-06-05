@@ -8,7 +8,7 @@ const EventEmitter = require('events');
  */
 class ClientManager extends EventEmitter{
 
-  constructor(){
+  constructor() {
     super();
     this.clients = new Set();
   }
@@ -32,13 +32,6 @@ class ClientManager extends EventEmitter{
   removeClient(client){
     this.clients.delete(client);
     this.emit("disconnection", client);
-  }
-
-  /**
-   * @returns {Set} Set of all the clients that can accept work
-   */
-  getClients(){
-    return this.clients;
   }
 }
 

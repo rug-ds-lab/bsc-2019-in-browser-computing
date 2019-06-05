@@ -66,3 +66,5 @@ typings/
 papers/
 
 package-lock.json
+
+/thesis/*

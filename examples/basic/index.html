@@ -1,6 +1,68 @@
 <html>
   <body>
-    <script src="../../dist/client.js"></script>
-    <script src="./basic-client.js"></script>
+    <script src="../../dist/distributed_stream_client.js"></script>
+    <script>
+        let worker;
+
+        if (window.Worker) {
+            worker = new Worker('./worker.js');
+        }
+       
+        const findPrimeFactors = (data) => {
+            const factors = [];
+
+            data.forEach((num) => {
+                const tempFactors = [];
+
+                for (let j = 2; j <= num; j++) {
+                    while ((num % j) === 0) {
+                        tempFactors.push(j);
+                        num /= j;
+                    }
+                }
+
+                factors.push(tempFactors);
+            });
+
+            return factors;
+        };
+
+        const workerPromise = (receivedData) => {
+            return new Promise((resolve, reject) => {
+                if (receivedData !== 'terminate') {
+                    //sending the message to the worker thread;
+                    worker.postMessage(receivedData);
+                } else {
+                    worker.terminate();
+                }
+
+                worker.onmessage = resolve;
+                worker.onerror = reject;
+            });
+        };
+
+        const workFunction = async (data) => {
+            // if (worker) {
+            //     let workerResponse = null;
+
+            //     await workerPromise(data).then(({ data }) => {
+            //         workerResponse = data;
+            //     });
+                
+            //     if (workerResponse !== null) {
+            //         return workerResponse;
+            //     }
+            // }
+            
+            return findPrimeFactors(data);
+        };
+
+        new Client({
+            host: "http://localhost",
+            port: 3000,
+            debug: true,
+            workFunction,
+        }).connect();
+    </script>
   </body>
 </html>
