@@ -18,9 +18,12 @@ app.use(express.static(path.join(__dirname, '../../')))
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const MF = new MatrixFactorization(),
-  maxIterations = 2000;
+  maxIterations = 2000,
+  threshold = 50;
   
-let timestep = 0;
+let timestep = 0,
+  iteration = 0,
+  lastLoss = 0;
 
 // Create a ParameterStream:
 // Works roughly like this currently:
@@ -28,11 +31,12 @@ let timestep = 0;
 var paramStream = new ParameterStream(MF);
 const distributedStream = new DistributedStream({socket: socketio(httpServer)});
 
-const f2 = function(_count, callback) {
-  console.log("Timestep:", timestep, "Loss: ", MF.loss());
+const f2 = function(count, callback) {
+  const loss = MF.loss();
+  console.log(`Iteration: ${iteration}, Timestep:, ${timestep}, Loss: ${loss}`);
 
-  if(false) {
-    return emit('end');
+  if(!timestep && Math.abs(loss - lastLoss) < threshold){
+    return this.emit('end');
   }
 
   let depvecs = [];
@@ -47,7 +51,11 @@ const f2 = function(_count, callback) {
     partitions[timestep]['parts'][idx]['partition'] = idx;
     this.emit("data", partitions[timestep]['parts'][idx]);
   }
-  timestep = (timestep + 1) % MF.workerCount; //TODO: Remove this 
+
+  timestep = count % MF.workerCount;
+  iteration = Math.floor(count / MF.workerCount);
+  lastLoss = loss;
+
   callback();
 }
 
