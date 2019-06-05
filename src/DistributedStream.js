@@ -21,7 +21,7 @@ class DistributedStream extends stream.Duplex {
      * @param {Object} [opt.distribution] The type of load distribution requested;
      * @param {String} [opt.distribution.type="chunk"] The type of load distribution server should provide.
      *        Can be `adaptive`, `single` or `chunk` (default)
-     * @param {Number} [opt.distribution.size=100] Chunk sizes for the load distribution if chunk was selected as type
+     * @param {Number} [opt.distribution.size=1] Chunk sizes for the load distribution if chunk was selected as type
      */
     constructor({
         debug = false,
@@ -32,7 +32,7 @@ class DistributedStream extends stream.Duplex {
         socket,
         distribution = {
             type: "chunk",
-            size: 100
+            size: 1
         }
     } = {}) {
 

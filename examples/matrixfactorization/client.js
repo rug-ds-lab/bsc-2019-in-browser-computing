@@ -1,16 +1,3 @@
-
-const findPrimeFactors = (num) => {
-    let factors = [];
-
-    for (let i = 2; i <= num; i++) {
-        while ((num % i) === 0) {
-            factors.push(i);
-            num /= i;
-        }
-    }
-    return factors;
-};
-
 const computeSum = (num) => {
     let outputs = num.map((job) => {
         let output = {};
@@ -21,22 +8,13 @@ const computeSum = (num) => {
     return outputs;
 };
 
-const randomize = (num) => {
-    let data = JSON.parse(num);
-    data['test'] = Math.random();
-    return JSON.stringify(data);
-};
-
   /**
    * Work function the clients use for calculating updates for the matrix factorization.
    *
    * @param raw Is the raw string received from the DistributedStream.
    */
-const updateMFParams = (raw) => {
-    let input = JSON.parse(raw);
-    console.log(input);
-    let output = processChunk(input);
-    return JSON.stringify(output);
+const updateMFParams = (data) => {
+    return processChunk(data);
 };
 
   /**
@@ -76,6 +54,7 @@ const processChunk = (chunk) => {
     let output = {};
     output['W_partition'] = W;
     output['H_partition'] = H;
+    output.partition = chunk.partition;
     return output;
 };
 
@@ -115,6 +94,6 @@ const loop_body = (e_idx, e_val, W, H) => {
 new Client({
     host: "http://localhost",
     port: 3000,
-    debug: false,
+    debug: true,
     workFunction: updateMFParams,
 }).connect();
