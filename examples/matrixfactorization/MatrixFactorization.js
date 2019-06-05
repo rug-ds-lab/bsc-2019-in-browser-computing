@@ -6,10 +6,10 @@ const Utils = require('./Utils');
 
 class MatrixFactorization {
     constructor() {
-      this.userCount = 1000;
-      this.movieCount = 800;
-      this.featureCount = 3;
-      this.workerCount = 3;
+      this.userCount = 100;
+      this.movieCount = 80;
+      this.featureCount = 30;
+      this.workerCount = 2;
 
       this.ratings = DataProvider.generateRandomSparseData(0.6, this.movieCount, this.userCount);
 

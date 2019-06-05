@@ -3,8 +3,8 @@
 const util = require('./Utilities.js'),
     ClientManager = require('./server/ClientManager.js'),
     Server = require('./server/Server.js'),
-    DataHandler = require('./DataHandler.js'),
-    LoadBalancer = require('./server/loadDistribution/LoadBalancer.js'),
+    DataHandler = require('./server/DataHandler.js'),
+    LoadBalancer = require('./server/LoadBalancer.js'),
     stream = require('stream');
 
 class DistributedStream extends stream.Duplex {
@@ -24,18 +24,24 @@ class DistributedStream extends stream.Duplex {
      * @param {Number} [opt.distribution.size=100] Chunk sizes for the load distribution if chunk was selected as type
      */
     constructor({
-        debug=false,
-        port=3000,
-        highWaterMark=100,
-        redundancy=1,
+        debug = false,
+        port = 3000,
+        highWaterMark = 100,
+        redundancy = 1,
         equalityFunction = ((obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2)),
         socket,
-        distribution={type:"chunk", size:100}
-        }={}) {
+        distribution = {
+            type: "chunk",
+            size: 100
+        }
+    } = {}) {
 
-        super({objectMode: true, highWaterMark: highWaterMark});
+        super({
+            objectMode: true,
+            highWaterMark: highWaterMark
+        });
 
-        if(!socket){
+        if (!socket) {
             throw new Error('socket is required');
         }
 
@@ -46,7 +52,10 @@ class DistributedStream extends stream.Duplex {
         /** count of data pieces written to the stream */
         this.writtenCount = 0;
 
-        this.dataHandler = new DataHandler({equalityFunction, redundancy})
+        this.dataHandler = new DataHandler({
+                equalityFunction,
+                redundancy
+            })
             .on("processed", this._putIntoStream.bind(this));
 
         this.clientManager = new ClientManager()
@@ -54,7 +63,10 @@ class DistributedStream extends stream.Duplex {
 
         this.loadBalancer = new LoadBalancer(this.clientManager, distribution);
 
-        this.server = new Server({socket, port})
+        this.server = new Server({
+                socket,
+                port
+            })
             .on("connection", this.loadBalancer.initializeClient.bind(this.loadBalancer))
             .on("connection", this.clientManager.addClient.bind(this.clientManager))
             .on("result", this.dataHandler.handleResult.bind(this.dataHandler))
@@ -65,7 +77,7 @@ class DistributedStream extends stream.Duplex {
      * Called by the stream implementation to indicate this stream should start/resume 
      * producing and pushing data.
      */
-    _read(){
+    _read() {
         this.backPressure = false;
         this.emit("resume");
     }
@@ -73,7 +85,7 @@ class DistributedStream extends stream.Duplex {
     /**
      * Called by the stream implementation when new data is written into this stream.
      */
-    _write(data, _encoding, callback){
+    _write(data, _encoding, callback) {
         this.dataHandler.addData(data);
         callback();
     }
@@ -82,19 +94,19 @@ class DistributedStream extends stream.Duplex {
      * Called by the stream implementation when data writing into this stream is finished.
      * @param {Function} callback 
      */
-    _final(callback){
+    _final(callback) {
         this.dataHandler.endOfData();
         callback();
     }
 
     // when called, coordinates the sending of a new batch
-    _sendJob(client){
-        if(this.dataHandler.isProcessingFinished()){
+    _sendJob(client) {
+        if (this.dataHandler.isProcessingFinished()) {
             return;
         }
 
         // wait if there is backpressure
-        if(this.backPressure){
+        if (this.backPressure) {
             return this.once("resume", this._sendJob.bind(this, client));
         }
 
@@ -112,10 +124,10 @@ class DistributedStream extends stream.Duplex {
      * All data should be written to the stream in the order it was read, so a data group
      * can be written only if the data group read one before was written into stream already.
      */
-    _putIntoStream(){
+    _putIntoStream() {
         let processedData;
-        while(!this.backPressure && (processedData = this.dataHandler.popProcessed(this.writtenCount)) !== undefined){
-            if(processedData){ // can be null to imply the end of results
+        while (!this.backPressure && (processedData = this.dataHandler.popProcessed(this.writtenCount)) !== undefined) {
+            if (processedData) { // can be null to imply the end of results
                 processedData = processedData.getMajorityResult();
             }
 

@@ -34,7 +34,8 @@ const randomize = (num) => {
    */
 const updateMFParams = (raw) => {
     let input = JSON.parse(raw);
-    let output = input.map(processChunk);
+    console.log(input);
+    let output = processChunk(input);
     return JSON.stringify(output);
 };
 
@@ -114,6 +115,6 @@ const loop_body = (e_idx, e_val, W, H) => {
 new Client({
     host: "http://localhost",
     port: 3000,
-    debug: true,
+    debug: false,
     workFunction: updateMFParams,
 }).connect();

@@ -24,4 +24,4 @@ const distributedStream = new DistributedStream({redundancy:1, socket: socketio(
 paramStream.pipe(distributedStream).pipe(paramStream);
 
 // Start the algorithm by sending something to the paramStream
-paramStream.write("{}");
+// paramStream.write("{}");
