@@ -11,57 +11,48 @@ class ParameterStream extends stream.Duplex {
       super(options);
 
       this.MF = new MatrixFactorization();
-      this.maxIterations = 1000;
+      this.maxIterations = 2000;
       this.iterations = 0;
       this.timestep = 0;
     }
 
     _read(size) {
+      //check if the current timestep is all sent, but not received back
+      if(){
+        return this.once("new timestep", _read.bind(this, size));
+      }
+
       console.log("Iteration:", this.iterations, "Timestep:", this.timestep, "\tLoss: ", this.MF.loss());
-      if(this.iterations < this.maxIterations) {
-          let depvecs = [];
-          let partitions = Partitioner.partitionDummy(
-            [this.MF.ratings, this.MF.W, this.MF.H], depvecs,
-            this.MF.workerCount,
-            this.MF.userCount,
-            this.MF.movieCount,
-            this.MF.featureCount);
-          console.log(partitions);
 
-          for (let idx = 0; idx < partitions[this.timestep]['parts'].length; idx++) {
-            partitions[this.timestep]['parts'][idx]['iteration'] = this.iterations;
-            partitions[this.timestep]['parts'][idx]['timestep'] = this.timestep;
-            partitions[this.timestep]['parts'][idx]['partition'] = idx;
-          }
-          console.log(partitions[this.timestep]['parts']);
-
-          for(let idx = 0; idx < this.MF.workerCount; idx++) {
-            this.push(JSON.stringify(partitions[this.timestep]['parts'][idx]));
-          }
-
-      } else {
+      if(this.iterations > this.maxIterations) {
         return this.emit('end');
       }
+
+      let depvecs = [];
+      let partitions = Partitioner.partitionDummy(
+        [this.MF.ratings, this.MF.W, this.MF.H], depvecs,
+        this.MF.workerCount,
+        this.MF.userCount,
+        this.MF.movieCount,
+        this.MF.featureCount);
+
+      for(let idx = 0; idx < this.MF.workerCount; idx++) {
+        partitions[this.timestep]['parts'][idx]['partition'] = idx;
+        this.push(JSON.stringify(partitions[this.timestep]['parts'][idx]));
+      }
+      this.iterations++; //TODO: Remove this 
     }
     
     _write(chunk, _encoding, callback) {
-        let data = JSON.parse(chunk);
-        if(Object.keys(data).length != 0) {
+      let data = JSON.parse(chunk);
+      this.MF.W.updateSubset(data['W_partition']);
+      this.MF.H.updateSubset(data['H_partition']);
 
-          data.map((processedData) => {
-            this.MF.W.updateSubset(processedData['W_partition']);
-            this.MF.H.updateSubset(processedData['H_partition']);
-          });
-
-          this.parameters = data;
-          if(this.timestep < this.MF.workerCount - 1) {
-            this.timestep++;
-          } else {
-            this.timestep = 0;
-            this.iterations++;
-          }
-        }
-        callback();
+      // current timestep is all processed
+      if(data.partition === this.MF.workerCount - 1) {
+        this.emit("new timestep");
+      }
+      callback();
     }
 }
 
