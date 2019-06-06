@@ -14,33 +14,35 @@ class Client {
      * @param {Function} options.workFunction The function the client will perform. Called with (data, callback).
      *                   Expected to call the callback as callback(result) when it's done evaluating the data.
      */
-    constructor({host, port, debug, reconnectInterval, workFunction}) {
+    constructor({host, port, debug, reconnectInterval, workFunction, scripts}) {
         if(!host) util.error("Server address has to be provided.");
         this.host = host;
 
-        if(!workFunction) util.error("The work function has to be provided.");
+        // if(!workFunction) util.error("The work function has to be provided.");
         this.workFunction = workFunction;
 
         this.port = port || 3000;
         this.debug = debug || false; 
         this.reconnectInterval = reconnectInterval || 5000;
 
-        this.worker = this.createWorker();
+        this.workFile = "examples/matrixfactorization/work.js"; //TODO:
+        this.worker = new Worker(this.workFile);
+        // this.worker = this.createWorker(this.workFile);
         this.connect();
     }
 
-    /**
-     * See https://stackoverflow.com/questions/5408406/web-workers-without-a-separate-javascript-file
-     */
-    createWorker(){
-        const wrapper = `onmessage = function(data){postMessage(data.data.map(${this.workFunction.toString()}))}`;
+    // /**
+    //  * See https://stackoverflow.com/questions/5408406/web-workers-without-a-separate-javascript-file
+    //  */
+    // createWorker(){
+    //     const wrapper = `self.onmessage = function(data){postMessage(data.data.map(${this.workFunction.toString()}))}`;
 
-        const blobURL = URL.createObjectURL( new Blob([wrapper], {type:'application/javascript'})),
-            worker = new Worker(blobURL);
+    //     const blobURL = URL.createObjectURL( new Blob([wrapper], {type:'application/javascript'})),
+    //     worker = new Worker(blobURL);
 
-        URL.revokeObjectURL(blobURL);
-        return worker;
-    }
+    //     URL.revokeObjectURL(blobURL);
+    //     return worker;
+    // }
 
     /**
      * Connect to the predefined host and port;
