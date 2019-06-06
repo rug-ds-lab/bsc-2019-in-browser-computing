@@ -3,8 +3,8 @@
 const util = require('./Utilities.js'),
     ClientManager = require('./server/ClientManager.js'),
     Server = require('./server/Server.js'),
-    DataHandler = require('./DataHandler.js'),
-    LoadBalancer = require('./server/loadDistribution/LoadBalancer.js'),
+    DataHandler = require('./server/DataHandler.js'),
+    LoadBalancer = require('./server/LoadBalancer.js'),
     stream = require('stream');
 
 class DistributedStream extends stream.Duplex {

@@ -1,4 +1,4 @@
-const util = require('../../Utilities.js'),
+const util = require('../Utilities.js'),
       from = 'In LoadBalancer.js';
 
 class LoadBalancer {

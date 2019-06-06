@@ -16,4 +16,4 @@ new Client({
     port: 3000,
     debug: true,
     workFunction: findPrimeFactors,
-}).connect();
+});
