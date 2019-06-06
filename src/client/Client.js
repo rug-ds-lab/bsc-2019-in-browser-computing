@@ -33,7 +33,7 @@ class Client {
      * See https://stackoverflow.com/questions/5408406/web-workers-without-a-separate-javascript-file
      */
     createWorker(){
-        const wrapper = `onmessage = function(data){const f=${this.workFunction.toString()};postMessage(data.data.map(f))}`;
+        const wrapper = `onmessage = function(data){postMessage(data.data.map(${this.workFunction.toString()}))}`;
 
         const blobURL = URL.createObjectURL( new Blob([wrapper], {type:'application/javascript'})),
             worker = new Worker(blobURL);
