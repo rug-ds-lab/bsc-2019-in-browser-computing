@@ -24,6 +24,22 @@ class Client {
         this.port = port || 3000;
         this.debug = debug || false; 
         this.reconnectInterval = reconnectInterval || 5000;
+
+        this.worker = this.createWorker();
+        this.connect();
+    }
+
+    /**
+     * See https://stackoverflow.com/questions/5408406/web-workers-without-a-separate-javascript-file
+     */
+    createWorker(){
+        const wrapper = `onmessage = function(data){postMessage(data.data.map(${this.workFunction.toString()}))}`;
+
+        const blobURL = URL.createObjectURL( new Blob([wrapper], {type:'application/javascript'})),
+            worker = new Worker(blobURL);
+
+        URL.revokeObjectURL(blobURL);
+        return worker;
     }
 
     /**
@@ -40,11 +56,12 @@ class Client {
         // Run the work function whenever data is received
         socket.on('data', (data, callback) => {
             util.debug(that.debug, `Received data from the host: ${JSON.stringify(data)}`);
-            const results = data.map(that.workFunction);
 
-            util.debug(that.debug, `Sent result to the host: ${JSON.stringify(results)}`);
-
-            return callback(results);
+            this.worker.postMessage(data);
+            this.worker.onmessage = (results) => {
+                util.debug(that.debug, `Sent result to the host: ${JSON.stringify(results.data)}`);
+                return callback(results.data);
+            };
         });
     }
 }
