@@ -18,8 +18,8 @@ app.use(express.static(path.join(__dirname, '../../')))
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const MF = new MatrixFactorization(),
-  maxIterations = 2000,
-  threshold = 50;
+  threshold = 50,
+  socket = socketio(httpServer);
   
 let timestep = 0,
   iteration = 0,
@@ -29,13 +29,14 @@ let timestep = 0,
 // Works roughly like this currently:
 // (updated parameters) -> paramStream -> (computationJobs) -> DistributedStream -> (updated parameters) -> paramStream
 var paramStream = new ParameterStream(MF);
-const distributedStream = new DistributedStream({socket: socketio(httpServer)});
+const distributedStream = new DistributedStream({socket});
 
 const f2 = function(count, callback) {
   const loss = MF.loss();
   console.log(`Iteration: ${iteration}, Timestep:, ${timestep}, Loss: ${loss}`);
 
   if(!timestep && Math.abs(loss - lastLoss) < threshold){
+    socket.emit('finish')
     return this.emit('end');
   }
 
@@ -59,12 +60,12 @@ const f2 = function(count, callback) {
   callback();
 }
 
-const f = function(_count, callback) {
+const f = function(count, callback) {
   // Returns promise which is resolved when "new timestep" event is emitted.
   // This means the next jobs can be pushed to the DistributedStream
-  return paramStream.once("new timestep", f2.bind(this, _count, callback));
+  socket.emit('counter', {iteration, timestep, lastLoss});
+  return paramStream.once("new timestep", f2.bind(this, count, callback));
 }
-
 
 // Connect the stream to eachother
 es.readable(f).pipe(distributedStream).pipe(paramStream);
