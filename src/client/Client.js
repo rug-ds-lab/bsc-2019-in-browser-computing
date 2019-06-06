@@ -1,7 +1,6 @@
 'use strict';
 
-const io = require('socket.io-client'),
-      util = require('../Utilities.js');
+const util = require('../Utilities.js');
 
 class Client {
     /**
@@ -15,6 +14,10 @@ class Client {
      *                   Expected to call the callback as callback(result) when it's done evaluating the data.
      */
     constructor({host, port, debug, reconnectInterval, workFunction}) {
+        if(!io){
+            util.error("Socket.io is needed.");
+        }
+
         if(!host) util.error("Server address has to be provided.");
         this.host = host;
 
@@ -54,7 +57,7 @@ class Client {
         });
 
         // Run the work function whenever data is received
-        socket.on('data', (data, callback) => {
+        socket.on('data-distributedstream', (data, callback) => {
             util.debug(that.debug, `Received data from the host: ${JSON.stringify(data)}`);
 
             this.worker.postMessage(data);
