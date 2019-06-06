@@ -31,6 +31,7 @@ const f2 = function(count, callback) {
   const loss = MF.loss();
   console.log(`Iteration: ${iteration}, Timestep:, ${timestep}, Loss: ${loss}`);
 
+  // stop producing partitions if we plateu-ed
   if(!timestep && Math.abs(loss - lastLoss) < threshold){
     socket.emit('finish')
     return this.emit('end');
