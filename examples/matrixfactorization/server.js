@@ -2,7 +2,7 @@ const DistributedStream = require('../../src/DistributedStream'),
   es = require('event-stream'),
   path = require('path'),
   socketio = require('socket.io'),
-  ParameterStream = require('./ParameterStream.js'),
+  EventEmitter = require('events'),
   MatrixFactorization = require('./MatrixFactorization'),
   Partitioner = require('./Partitioner');
 
@@ -25,10 +25,6 @@ let timestep = 0,
   iteration = 0,
   lastLoss = 0;
 
-// Create a ParameterStream:
-// Works roughly like this currently:
-// (updated parameters) -> paramStream -> (computationJobs) -> DistributedStream -> (updated parameters) -> paramStream
-var paramStream = new ParameterStream(MF);
 const distributedStream = new DistributedStream({socket});
 
 const f2 = function(count, callback) {
@@ -60,15 +56,27 @@ const f2 = function(count, callback) {
   callback();
 }
 
+const e = new EventEmitter();
 const f = function(count, callback) {
   // Returns promise which is resolved when "new timestep" event is emitted.
   // This means the next jobs can be pushed to the DistributedStream
   socket.emit('counter', {iteration, timestep, lastLoss});
-  return paramStream.once("new timestep", f2.bind(this, count, callback));
+  return e.once("new timestep", f2.bind(this, count, callback));
 }
 
-// Connect the stream to eachother
-es.readable(f).pipe(distributedStream).pipe(paramStream);
+// updates the matrix with results, triggers a new timestep if the current one is over
+const handleResult = (data) =>  {
+  MF.W.updateSubset(data.W_partition);
+  MF.H.updateSubset(data.H_partition);
 
-// paramStream.emit("new timestep");
-setTimeout(() => paramStream.emit("new timestep"), 1000);
+  // current timestep is all processed
+  if(data.partition === MF.workerCount - 1) {
+    e.emit("new timestep");
+  }
+};
+
+// Connect the stream to eachother
+es.readable(f).pipe(distributedStream).on("data", handleResult);
+
+// e.emit("new timestep");
+setTimeout(() => e.emit("new timestep"), 1000);
