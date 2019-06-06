@@ -8,7 +8,7 @@ class MatrixFactorization {
       this.featureCount = 50;
       this.workerCount = 5;
 
-      this.ratings = generateRandomSparseData(0.6, this.movieCount, this.userCount);
+      this.ratings = this.generateRandomSparseData(0.6, this.movieCount, this.userCount);
 
       this.W = new SparseDistArray(2);
       this.W.randomize(this.userCount, this.featureCount);

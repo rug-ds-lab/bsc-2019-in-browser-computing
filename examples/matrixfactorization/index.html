@@ -5,7 +5,7 @@
 
     <script>
       const socket = io.connect("localhost:3000");
-      new Client({socket});
+      new Client({socket, debug:true});
 
       socket.on("counter", (data) => {
         console.log(data);
