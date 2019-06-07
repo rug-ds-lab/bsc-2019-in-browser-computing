@@ -19,7 +19,6 @@ class Server extends EventEmitter {
 
     sendData(client, datas){
         client.load.lastSendTime = Date.now();
-
         const strippedData = datas.map(data => data.data);
         client.emit("data-distributedstream", strippedData, this.handleResult.bind(this, client, datas));
     }

@@ -114,6 +114,7 @@ class DistributedStream extends stream.Duplex {
      */
     _putIntoStream(){
         let processedData;
+
         while(!this.backPressure && (processedData = this.dataHandler.popProcessed(this.writtenCount)) !== undefined){
             if(processedData){ // can be null to imply the end of results
                 processedData = processedData.getMajorityResult();
