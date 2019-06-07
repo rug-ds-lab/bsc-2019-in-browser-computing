@@ -23,15 +23,14 @@ class DataHandler extends EventEmitter {
 
         /**
          * Buffers for data pieces that:
-         *  - can be sent to a suitable worker right away.
-         *  - are currently being processed by enough workers.
+         *  - isn't done with processing yet (but it might be being processed by enough workers atm)
          *  - are totally processed, but not written to the stream yet. The key is the read order.
          * 
          *  Also stores the data/client pair that should be sent the next
          *  in an object that is {client, data}.
          */
         this.data = new Map();
-        this.canBeSent = [];
+        this.waiting = [];
         this.processed = []; // TODO: Keep sorted!!!
     }
 
@@ -45,12 +44,12 @@ class DataHandler extends EventEmitter {
 
         this.data.set(order, new Data({
             data,
-            order, //TODO: Is necessary?
+            order,
             redundancy: this.redundancy,
             equalityFunction: this.equalityFunction
         }));
 
-        this.canBeSent.push(order)
+        this.waiting.push(order)
         this.emit("new-data");
     }
 
@@ -62,9 +61,6 @@ class DataHandler extends EventEmitter {
     removeVote(client){
         client.data.forEach((order) => {
             this.data.get(order).removeVoter(client);
-            if(this.canBeSent.indexOf(order) === -1){ // TODO: Better way?
-                this.canBeSent.unshift(order);
-            }
         });
     }
 
@@ -75,6 +71,7 @@ class DataHandler extends EventEmitter {
         if(data.doneWithProcessing()){
             this.processed.push(data.order);
             this.counts.processed++;
+            this.waiting.splice(this.waiting.indexOf(data.order), 1);
             this.emit("processed");
         }
     }
@@ -96,21 +93,14 @@ class DataHandler extends EventEmitter {
         const datas = [];
 
         // get data the client can vote for, up to the given count
-        for(let i=0; i<this.canBeSent.length && datas.length < count; i++){
-            const order = this.canBeSent[i];
+        for(let i=0; i<this.waiting.length && datas.length < count; i++){
+            const order = this.waiting[i];
+            const data = this.data.get(order);
 
-            if(this.data.get(order).canVote(client)){
+            if(data.canVote(client)){
                 client.data.add(order);
-
-                const data = this.data.get(order);
-
                 datas.push(data);
                 data.addVoter(client);
-                // if we don't need to send this anymore, do book keeping
-                if(!data.shouldBeSent()){
-                    this.canBeSent.splice(i,1);
-                    i--;
-                }
             }
         }
 

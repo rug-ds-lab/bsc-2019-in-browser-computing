@@ -33,7 +33,7 @@ class Data{
   }
 
   canVote(client){
-    return !this.voters.find(el => el.id === client.id);
+    return this.shouldBeSent() && !this.voters.find(el => el.id === client.id);
   }
 
   getMajorityResult(){
