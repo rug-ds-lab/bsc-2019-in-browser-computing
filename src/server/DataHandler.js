@@ -1,5 +1,6 @@
 const EventEmitter = require('events'),
-    Data = require('./Data.js');
+    Data = require('./Data.js'),
+    SortedArray = require('../SortedArray.js');
 
 class DataHandler extends EventEmitter {
     constructor({equalityFunction, redundancy}){
@@ -30,8 +31,8 @@ class DataHandler extends EventEmitter {
          *  in an object that is {client, data}.
          */
         this.data = new Map();
-        this.waiting = [];
-        this.processed = []; // TODO: Keep sorted!!!
+        this.waiting = new SortedArray();
+        this.processed = new SortedArray();
     }
 
     /**
@@ -49,7 +50,7 @@ class DataHandler extends EventEmitter {
             equalityFunction: this.equalityFunction
         }));
 
-        this.waiting.push(order)
+        this.waiting.add(order)
         this.emit("new-data");
     }
 
@@ -69,9 +70,9 @@ class DataHandler extends EventEmitter {
 
         // if done with processing this piece, move it to the processed buffer
         if(data.doneWithProcessing()){
-            this.processed.push(data.order);
+            this.processed.add(data.order);
             this.counts.processed++;
-            this.waiting.splice(this.waiting.indexOf(data.order), 1);
+            this.waiting.remove(data.order);
             this.emit("processed");
         }
     }
@@ -93,8 +94,11 @@ class DataHandler extends EventEmitter {
         const datas = [];
 
         // get data the client can vote for, up to the given count
-        for(let i=0; i<this.waiting.length && datas.length < count; i++){
-            const order = this.waiting[i];
+        for(let order of this.waiting.generator()){
+            if(datas.length === count){
+                break;
+            }
+
             const data = this.data.get(order);
 
             if(data.canVote(client)){
@@ -113,15 +117,13 @@ class DataHandler extends EventEmitter {
     }
 
     popProcessed(order){
-        //TODO: Make this efficient by adding sorted arrays
-        let index;
-
         // no more data left, put null to the stream to close it
         if(this.isProcessingFinished() && !this.data.size){
             return null;
         }
 
-        if((index = this.processed.indexOf(order)) === -1){
+        // the requested data isn't processed yet
+        if(!this.processed.has(order)){
             return undefined;
         }
 
@@ -129,7 +131,7 @@ class DataHandler extends EventEmitter {
 
         // remove this data piece from everywhere
         this.data.delete(order);
-        this.processed.splice(index, 1);
+        this.processed.remove(order);
 
         return data;
     }
