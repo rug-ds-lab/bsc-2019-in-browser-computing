@@ -5,7 +5,8 @@ module.exports = {
   entry: {
     Client: './src/client/Client.js',
     Utils: './examples/matrixfactorization/Utils.js',
-    SparseDistArray: './examples/matrixfactorization/SparseDistArray.js'
+    SparseDistArray: './examples/matrixfactorization/SparseDistArray.js',
+    ParameterMatrix: './examples/matrixfactorization/ParameterMatrix.js'
   },
   output: {
     path: path.resolve(__dirname, 'dist'),

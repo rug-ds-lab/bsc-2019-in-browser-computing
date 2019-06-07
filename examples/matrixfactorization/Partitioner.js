@@ -9,14 +9,16 @@ class Partitioner {
         let W = iteration_space[1];
         let H = iteration_space[2];
 
+        // console.log(W.data.length);
+
         // console.log(data);
         let chunksUsers = Utils.chunkBeginEnd(user_count, worker_count);
         let chunksMovies = Utils.chunkBeginEnd(movie_count, worker_count);
 
         let partitions = [];
-
         // Necessary to do this in <worker_count> amount of time steps.
         for(let timestep = 0; timestep < worker_count; timestep++) {
+
             let partition = {};
             partition['timestep'] = timestep;
             partition['parts'] = [];
@@ -26,8 +28,8 @@ class Partitioner {
                 let i = (idx + timestep) % worker_count;
 
                 let data_partition = data.getSubset([chunksUsers[i], chunksMovies[idx]]);
-                let W_partition = W.getSubset([chunksUsers[i], [0, feature_count-1]]);
-                let H_partition = H.getSubset([chunksMovies[idx], [0, feature_count-1]]);
+                let W_partition = W.getRows(chunksUsers[i][0], chunksUsers[i][1]);
+                let H_partition = H.getRows(chunksMovies[idx][0], chunksMovies[idx][1]);
 
                 partition_part['data_partition'] = data_partition;
                 partition_part['W_partition'] = W_partition;

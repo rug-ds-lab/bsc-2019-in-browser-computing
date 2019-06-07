@@ -10,6 +10,7 @@ const DistributedStream = require('../../src/DistributedStream'),
 // Set up a basic server serving a single page
 const express = require('express')
 const app = express()
+
 const port = 3000;
 
 const httpServer = app.listen(port);
@@ -19,7 +20,7 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const MF = new MatrixFactorization(),
   maxIterations = 2000,
-  threshold = 50;
+  threshold = 0.001;
   
 let timestep = 0,
   iteration = 0,
@@ -33,9 +34,10 @@ const distributedStream = new DistributedStream({socket: socketio(httpServer)});
 
 const f2 = function(count, callback) {
   const loss = MF.loss();
-  console.log(`Iteration: ${iteration}, Timestep:, ${timestep}, Loss: ${loss}`);
+  console.log(`Iteration: ${iteration}, Timestep: ${timestep}, Loss: ${loss}`);
 
-  if(!timestep && Math.abs(loss - lastLoss) < threshold){
+  if(iteration > 1000 || (!timestep && Math.abs(loss - lastLoss) < threshold)) {
+    console.log("Converged. Stopping.");
     return this.emit('end');
   }
 
