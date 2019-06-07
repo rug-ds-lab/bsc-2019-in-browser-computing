@@ -1,10 +1,17 @@
 <html>
   <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.slim.js"></script>
     <script src="dist/distributed_stream_Client.js"></script>
-    <script src="dist/distributed_stream_SparseDistArray.js"></script>
-    <script src="dist/distributed_stream_ParameterMatrix.js"></script>
-    <script src="dist/distributed_stream_Utils.js"></script>
-    <script src="examples/matrixfactorization/client.js"></script>
-    <script src="examples/matrixfactorization/wasm/matrixfactorization.js"></script>
+
+    <script>
+      const socket = io.connect("localhost:3000");
+      new Client({socket, debug:true});
+
+      socket.on("counter", (data) => {
+        console.log(data);
+      });
+
+      socket.on("finish", ()=>{console.log("Finish")})
+    </script>
   </body>
 </html>

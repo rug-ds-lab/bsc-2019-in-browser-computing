@@ -32,7 +32,7 @@ class DistributedStream extends stream.Duplex {
         socket,
         distribution = {
             type: "chunk",
-            size: 1
+            size: 100
         }
     } = {}) {
 

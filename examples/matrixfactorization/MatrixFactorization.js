@@ -1,4 +1,4 @@
-const DataProvider = require('./DataProvider');
+// const DataProvider = require('./DataProvider');
 const SparseDistArray = require('./SparseDistArray');
 const ParameterMatrix = require('./ParameterMatrix');
 
@@ -12,7 +12,7 @@ class MatrixFactorization {
       this.featureCount = 15;
       this.workerCount = 1;
 
-      this.ratings = DataProvider.generateRandomSparseData(0.6, this.movieCount, this.userCount);
+      this.ratings = this.generateRandomSparseData(0.6, this.movieCount, this.userCount);
 
       this.W = new ParameterMatrix(this.userCount, this.featureCount);
       this.W.randomize();
@@ -49,6 +49,19 @@ class MatrixFactorization {
             }
         }
         return sum;
+    }
+
+    generateRandomSparseData(alpha, movieCount, usersCount) {
+        let data = new SparseDistArray(2);
+        for (var idx_m = 0; idx_m < movieCount; idx_m++) {
+            for (var idx_u = 0; idx_u < usersCount; idx_u++) {
+                if(Math.random() < alpha) {
+                    let rating = Math.floor(Math.random() * 5 + 1);
+                    data.add(idx_u, idx_m, rating);
+                }
+            }
+        }
+        return data;
     }
 }
 

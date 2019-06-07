@@ -2,7 +2,7 @@ const DistributedStream = require('../../src/DistributedStream'),
   es = require('event-stream'),
   path = require('path'),
   socketio = require('socket.io'),
-  ParameterStream = require('./ParameterStream.js'),
+  EventEmitter = require('events'),
   MatrixFactorization = require('./MatrixFactorization'),
   Partitioner = require('./Partitioner');
 
@@ -19,25 +19,22 @@ app.use(express.static(path.join(__dirname, '../../')))
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const MF = new MatrixFactorization(),
-  maxIterations = 2000,
-  threshold = 0.001;
+  threshold = 50,
+  socket = socketio(httpServer);
   
 let timestep = 0,
   iteration = 0,
   lastLoss = 0;
 
-// Create a ParameterStream:
-// Works roughly like this currently:
-// (updated parameters) -> paramStream -> (computationJobs) -> DistributedStream -> (updated parameters) -> paramStream
-var paramStream = new ParameterStream(MF);
-const distributedStream = new DistributedStream({socket: socketio(httpServer)});
+const distributedStream = new DistributedStream({socket});
 
 const f2 = function(count, callback) {
   const loss = MF.loss();
   console.log(`Iteration: ${iteration}, Timestep: ${timestep}, Loss: ${loss}`);
 
-  if(iteration > 1000 || (!timestep && Math.abs(loss - lastLoss) < threshold)) {
-    console.log("Converged. Stopping.");
+  // stop producing partitions if we plateu-ed
+  if(!timestep && Math.abs(loss - lastLoss) < threshold){
+    socket.emit('finish')
     return this.emit('end');
   }
 
@@ -61,15 +58,32 @@ const f2 = function(count, callback) {
   callback();
 }
 
-const f = function(_count, callback) {
+const e = new EventEmitter();
+const f = function(count, callback) {
   // Returns promise which is resolved when "new timestep" event is emitted.
   // This means the next jobs can be pushed to the DistributedStream
-  return paramStream.once("new timestep", f2.bind(this, _count, callback));
+  socket.emit('counter', {iteration, timestep, lastLoss});
+  return e.once("new timestep", f2.bind(this, count, callback));
 }
 
+// updates the matrix with results, triggers a new timestep if the current one is over
+const handleResult = (data) =>  {
+
+  // let data = chunk;
+  // console.log(data);
+  MF.W.updateSubset(data.W_partition, data.W_partition.begin_m, data.W_partition.end_m, 0, MF.featureCount);
+  MF.H.updateSubset(data.H_partition, data.H_partition.begin_m, data.H_partition.end_m, 0, MF.featureCount);
+  // MF.W.updateSubset(data.W_partition);
+  // MF.H.updateSubset(data.H_partition);
+
+  // current timestep is all processed
+  if(data.partition === MF.workerCount - 1) {
+    e.emit("new timestep");
+  }
+};
 
 // Connect the stream to eachother
-es.readable(f).pipe(distributedStream).pipe(paramStream);
+es.readable(f).pipe(distributedStream).on("data", handleResult);
 
-// paramStream.emit("new timestep");
-setTimeout(() => paramStream.emit("new timestep"), 1000);
+// e.emit("new timestep");
+setTimeout(() => e.emit("new timestep"), 1000);
