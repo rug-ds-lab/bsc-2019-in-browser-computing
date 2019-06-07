@@ -63,6 +63,7 @@ class DataHandler extends EventEmitter {
         client.data.forEach((order) => {
             this.data.get(order).removeVoter(client);
         });
+        this.emit("new-data");
     }
 
     handleResult(data, result){
