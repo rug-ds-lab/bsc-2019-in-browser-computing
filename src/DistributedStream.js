@@ -30,7 +30,8 @@ class DistributedStream extends stream.Duplex {
         redundancy=1,
         equalityFunction = ((obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2)),
         socket,
-        distribution={type:"chunk", size:100}
+        distribution={type:"chunk", size:100},
+        initialData
         }={}) {
 
         super({objectMode: true, highWaterMark: highWaterMark});
@@ -54,7 +55,7 @@ class DistributedStream extends stream.Duplex {
 
         this.loadBalancer = new LoadBalancer(this.clientManager, distribution);
 
-        this.server = new Server({socket, port})
+        this.server = new Server({socket, port, initialData})
             .on("connection", this.loadBalancer.initializeClient.bind(this.loadBalancer))
             .on("connection", this.clientManager.addClient.bind(this.clientManager))
             .on("result", this.dataHandler.handleResult.bind(this.dataHandler))

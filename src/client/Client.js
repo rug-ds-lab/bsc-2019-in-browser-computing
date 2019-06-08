@@ -6,63 +6,36 @@ class Client {
     /**
      * Initialize a client
      * @param {Object} options Consists of the options
-     * @param {String} options.host Server address.
-     * @param {Number} [options.port=3000] The port of the server machine.
      * @param {Boolean} [options.debug=false] Debug mode
      * @param {Number} [options.reconnectInterval=5000] The time (in ms) to wait before trying to reconnect to the server.
-     * @param {Function} options.workFunction The function the client will perform. Called with (data, callback).
-     *                   Expected to call the callback as callback(result) when it's done evaluating the data.
+     * @param {String} options.workFile
      */
-    constructor({host, port, debug, reconnectInterval, workFunction}) {
-        if(!io){
-            util.error("Socket.io is needed.");
-        }
+    constructor({socket, debug, reconnectInterval, workFile}) {
+        if(!socket) util.error("Socket has to be provided.");
+        this.socket = socket;
 
-        if(!host) util.error("Server address has to be provided.");
-        this.host = host;
+        if(!workFile) util.error("The work file has to be provided.");
+        this.worker = new Worker(workFile);
 
-        if(!workFunction) util.error("The work function has to be provided.");
-        this.workFunction = workFunction;
-
-        this.port = port || 3000;
         this.debug = debug || false; 
         this.reconnectInterval = reconnectInterval || 5000;
 
-        this.worker = this.createWorker();
-        this.connect();
-    }
-
-    /**
-     * See https://stackoverflow.com/questions/5408406/web-workers-without-a-separate-javascript-file
-     */
-    createWorker(){
-        const wrapper = `onmessage = function(data){postMessage(data.data.map(${this.workFunction.toString()}))}`;
-
-        const blobURL = URL.createObjectURL( new Blob([wrapper], {type:'application/javascript'})),
-            worker = new Worker(blobURL);
-
-        URL.revokeObjectURL(blobURL);
-        return worker;
-    }
-
-    /**
-     * Connect to the predefined host and port;
-     */
-    connect() {
-        const that = this;
-        const socket = io.connect(`${this.host}:${this.port}`);
-
-        socket.on('connect', () => {
-            util.debug(that.debug, "Connected to the host");
+        this.socket.on('connect', () => {
+            util.debug(this.debug, "Connected to the host");
+        });
+        
+        this.socket.on('initial-data-distributedstream', (data) => {
+            util.debug(this.debug, "Received initial data");
+            this.worker.postMessage({initialData:data});
         });
 
         // Run the work function whenever data is received
-        socket.on('data-distributedstream', (data, callback) => {
-            util.debug(that.debug, `Received data from the host: ${JSON.stringify(data)}`);
+        this.socket.on('data-distributedstream', (data, callback) => {
+            util.debug(this.debug, `Received data from the host: ${JSON.stringify(data)}`);
 
             this.worker.postMessage(data);
             this.worker.onmessage = (results) => {
-                util.debug(that.debug, `Sent result to the host: ${JSON.stringify(results.data)}`);
+                util.debug(this.debug, `Sent result to the host: ${JSON.stringify(results.data)}`);
                 return callback(results.data);
             };
         });
