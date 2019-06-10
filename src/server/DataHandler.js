@@ -3,10 +3,9 @@ const EventEmitter = require('events'),
     SortedArray = require('../SortedArray.js');
 
 class DataHandler extends EventEmitter {
-    constructor({equalityFunction, redundancy}){
+    constructor({redundancy}){
         super();
 
-        this.equalityFunction = equalityFunction;
         this.redundancy = redundancy;
 
         /**
@@ -46,8 +45,7 @@ class DataHandler extends EventEmitter {
         this.data.set(order, new Data({
             data,
             order,
-            redundancy: this.redundancy,
-            equalityFunction: this.equalityFunction
+            redundancy: this.redundancy
         }));
 
         this.waiting.add(order)
