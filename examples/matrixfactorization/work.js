@@ -3,6 +3,14 @@ self.importScripts("/dist/distributed_stream_Utils.js");
 self.importScripts("/dist/distributed_stream_ParameterMatrix.js");
 self.importScripts("mf_wasm.js");
 
+class Polygon {
+  constructor(height, width) {
+    this.height = height;
+    this.width = width;
+  }
+}
+new Polygon(5, 3);
+
 const loop_body = (e_idx, e_val, parameters, hyperparameters) => {
   let user = e_idx[0];
   let movie = e_idx[1];
@@ -97,15 +105,19 @@ const processChunkWasm = (chunk) => {
 
   let vecW = Module.returnVector();
   let vecH = Module.returnVector();
-  let mapData = Module.returnMapData();
+  // let mapData = Module.returnMapData();
 
   copyTypedArray2CPPVec(W.data, vecW);
   copyTypedArray2CPPVec(H.data, vecH);
-  copyMap2CPPMap(training_data, mapData);
+  // copyMap2CPPMap(training_data, mapData);
 
-  console.time('computeUpdatesWasm');
-  Module.computeUpdates(mapData, vecW, vecH, W.m, W.begin_m, H.m, H.begin_m, featureCount, learningRate, beta);
-  console.timeEnd('computeUpdatesWasm');
+  console.time('computeUpdatesWasm2');
+  training_data.forEach((value, key) => Module.computeUpdate(key, value, vecW, vecH, W.m, W.begin_m, H.m, H.begin_m, featureCount, learningRate, beta));
+  console.timeEnd('computeUpdatesWasm2');
+
+  // console.time('computeUpdatesWasm');
+  // Module.computeUpdates(mapData, vecW, vecH, W.m, W.begin_m, H.m, H.begin_m, featureCount, learningRate, beta);
+  // console.timeEnd('computeUpdatesWasm');
 
   copyCPPVec2TypedArray(vecW, W.data);
   copyCPPVec2TypedArray(vecH, H.data);
@@ -121,6 +133,14 @@ const processChunkWasm = (chunk) => {
 
 
 self.onmessage = (event) => {
-  Module.ready.then(() => postMessage(event.data.map(processChunkWasm)));
+
+  Module.ready.then(() => {
+    console.time('computeUpdatesWasmTotal');
+    postMessage(event.data.map(processChunkWasm))
+    console.timeEnd('computeUpdatesWasmTotal');
+  });
+  // console.time('computeUpdatesJSTotal');
   // postMessage(event.data.map(processChunk));
+  // console.timeEnd('computeUpdatesJSTotal');
+
 };

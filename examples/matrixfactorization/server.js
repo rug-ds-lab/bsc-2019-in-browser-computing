@@ -73,8 +73,7 @@ const f = function(count, callback) {
 // updates the matrix with results, triggers a new timestep if the current one is over
 const handleResult = (result) =>  {
   for(const [key, value] of Object.entries(result.parameters)) {
-    let paramMatrix = Object.create(ParameterMatrix.prototype, Object.getOwnPropertyDescriptors(value));
-    paramMatrix.data = new Float32Array(Object.values(value.data));
+    let paramMatrix = ParameterMatrix.parse(value);
     MF.parameters[key].updateSubset(paramMatrix);
   }
 

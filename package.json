@@ -12,8 +12,6 @@
   "dependencies": {
     "event-stream": "^4.0.1",
     "express": "^4.17.1",
-    "mathjs": "^5.10.3",
-    "ndarray": "^1.0.18",
     "socket.io": "^2.2.0"
   },
   "devDependencies": {

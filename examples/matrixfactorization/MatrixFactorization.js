@@ -6,8 +6,8 @@ const Utils = require('./Utils');
 
 class MatrixFactorization {
     constructor() {
-      this.userCount = 10;
-      this.movieCount = 8;
+      this.userCount = 100;
+      this.movieCount = 80;
       this.featureCount = 3;
       this.workerCount = 1;
 
@@ -52,6 +52,20 @@ class MatrixFactorization {
             }
         }
         return data;
+    }
+
+    loop_body() {
+        
+    }
+
+    algorithm() {
+        // while(diffLoss > 10) {
+        //     for(data in this.data) {
+        //         loop_body() {
+
+        //         }
+        //     }
+        // }
     }
 }
 
