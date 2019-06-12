@@ -3,22 +3,25 @@ self.importScripts("/dist/distributed_stream_Utils.js");
 self.importScripts("/dist/distributed_stream_ParameterMatrix.js");
 self.importScripts("mf_wasm.js");
 
-const loop_body = (e_idx, e_val, W, H, learningRate, beta, featureCount) => {
+const loop_body = (e_idx, e_val, parameters, hyperparameters) => {
   let user = e_idx[0];
   let movie = e_idx[1];
   let rating = e_val;
+
+  let W = parameters.W;
+  let H = parameters.H;
 
   let predictedRating = Utils.dotDicts(H.getRow(movie), W.getRow(user));
   let error = rating - predictedRating;
 
   // Iterate over features
-  for(let idx_f = 0; idx_f < featureCount; idx_f++) {
+  for(let idx_f = 0; idx_f < hyperparameters.get('featureCount'); idx_f++) {
       let updatedW = W.get(user, idx_f) +
-          learningRate * (2 * error * H.get(movie, idx_f) - beta * W.get(user, idx_f));
+        hyperparameters.get('learningRate') * (2 * error * H.get(movie, idx_f) - hyperparameters.get('beta') * W.get(user, idx_f));
       W.update(user, idx_f, updatedW);
 
       let updatedH = H.get(movie, idx_f) +
-          learningRate * (2 * error * W.get(user, idx_f) - beta * H.get(movie, idx_f));
+        hyperparameters.get('learningRate') * (2 * error * W.get(user, idx_f) - hyperparameters.get('beta') * H.get(movie, idx_f));
       H.update(movie, idx_f, updatedH);
   }
 }
@@ -39,29 +42,20 @@ const processChunk = (chunk) => {
    * @param H Parameters in H
    */
 
-  let training_data = new Map(chunk.data_partition);
-  let params = chunk.param_partitions;
-  let learningRate = chunk.hyperparameters.learningRate;
-  let featureCount = chunk.hyperparameters.featureCount;
-  let beta = chunk.hyperparameters.beta;
+  let training_data = new Map(chunk.data);
+  let hyperparameters = new Map(chunk.hyperparameters);
 
+  let parameters = {};
+  for(const [key, value] of Object.entries(chunk.parameters)) {
+    parameters[key] = ParameterMatrix.parse(value);
+  }
 
-  let W = Object.create(ParameterMatrix.prototype, Object.getOwnPropertyDescriptors(params.W_partition));
-  W.data = new Float32Array(Object.values(params.W_partition.data));
-
-  let H = Object.create(ParameterMatrix.prototype, Object.getOwnPropertyDescriptors(params.H_partition));
-  H.data = new Float32Array(Object.values(params.H_partition.data));
-
-
-  // Iterate over all the data. (using a double for loop, because of the dict data structure.)
-  // Ideally, the system would be able to do this by itself, so the user only needs to provide the "loop_body" function.
   console.time('computeUpdatesJS');
-  training_data.forEach((value, key) => loop_body(key.split(',').map(Number), value, W, H, learningRate, beta, featureCount));
+  training_data.forEach((value, key) => loop_body(key.split(',').map(Number), value, parameters, hyperparameters));
   console.timeEnd('computeUpdatesJS');
 
   let output = {};
-  output.W_partition = W;
-  output.H_partition = H;
+  output.parameters = parameters;
   output.partition = chunk.partition;
 
   return output;
@@ -91,17 +85,15 @@ copyMap2CPPMap = (map, cppMap) => {
 * @param raw Is the raw string received from the DistributedStream.
 */
 const processChunkWasm = (chunk) => {
-  let training_data = new Map(chunk.data_partition);
-  let params = chunk.param_partitions;
-  let learningRate = chunk.hyperparameters.learningRate;
-  let featureCount = chunk.hyperparameters.featureCount;
-  let beta = chunk.hyperparameters.beta;
+  let training_data = new Map(chunk.data);
+  let hyperparameters = new Map(chunk.hyperparameters);
 
-  let W = Object.create(ParameterMatrix.prototype, Object.getOwnPropertyDescriptors(params.W_partition));
-  W.data = new Float32Array(Object.values(params.W_partition.data));
+  let learningRate = hyperparameters.get('learningRate');
+  let featureCount = hyperparameters.get('featureCount');
+  let beta = hyperparameters.get('beta');
 
-  let H = Object.create(ParameterMatrix.prototype, Object.getOwnPropertyDescriptors(params.H_partition));
-  H.data = new Float32Array(Object.values(params.H_partition.data));
+  let W = ParameterMatrix.parse(chunk.parameters.W);
+  let H = ParameterMatrix.parse(chunk.parameters.H);
 
   let vecW = Module.returnVector();
   let vecH = Module.returnVector();
@@ -119,8 +111,9 @@ const processChunkWasm = (chunk) => {
   copyCPPVec2TypedArray(vecH, H.data);
 
   let output = {};
-  output.W_partition = W;
-  output.H_partition = H;
+  output.parameters = {};
+  output.parameters.W = W;
+  output.parameters.H = H;
   output.partition = chunk.partition;
 
   return output;

@@ -54,8 +54,8 @@ class Partitioner {
 
             let H_idx = (W_idx + timestep) % workerCount;
 
-            part.W_partition = W.getRows(chunksUsers[W_idx][0], chunksUsers[W_idx][1]);
-            part.H_partition = H.getRows(chunksMovies[H_idx][0], chunksMovies[H_idx][1]);
+            part.W = W.getRows(chunksUsers[W_idx][0], chunksUsers[W_idx][1]);
+            part.H = H.getRows(chunksMovies[H_idx][0], chunksMovies[H_idx][1]);
 
             partitions.push(part);
         }

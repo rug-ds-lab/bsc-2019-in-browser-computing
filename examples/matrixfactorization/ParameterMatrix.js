@@ -71,6 +71,12 @@ class ParameterMatrix {
     size() {
         return this.data.length;
     }
+
+    static parse(serializedParameterMatrix) {
+        let paramMatrix = Object.create(ParameterMatrix.prototype, Object.getOwnPropertyDescriptors(serializedParameterMatrix));
+        paramMatrix.data = new Float32Array(Object.values(serializedParameterMatrix.data));
+        return paramMatrix;
+    }
 }
 
 module.exports = ParameterMatrix;

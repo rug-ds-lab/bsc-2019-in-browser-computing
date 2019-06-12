@@ -6,20 +6,20 @@ const Utils = require('./Utils');
 
 class MatrixFactorization {
     constructor() {
-      this.userCount = 1000;
-      this.movieCount = 800;
-      this.featureCount = 15;
-      this.workerCount = 3;
+      this.userCount = 10;
+      this.movieCount = 8;
+      this.featureCount = 3;
+      this.workerCount = 1;
 
       this.learningRate = 0.002;
       this.beta = 0.02;
 
-      this.ratings = this.generateRandomNetflixDataset(0.6, this.movieCount, this.userCount);
-
-      this.W = new ParameterMatrix(this.userCount, this.featureCount);
-      this.W.randomize();
-      this.H = new ParameterMatrix(this.movieCount, this.featureCount);
-      this.H.randomize();
+      this.data = this.generateRandomNetflixDataset(0.6, this.movieCount, this.userCount);
+      this.parameters = {};
+      this.parameters.W = new ParameterMatrix(this.userCount, this.featureCount);
+      this.parameters.W.randomize();
+      this.parameters.H = new ParameterMatrix(this.movieCount, this.featureCount);
+      this.parameters.H.randomize();
     }
 
     /**
@@ -27,14 +27,14 @@ class MatrixFactorization {
      */
     loss() {
         let sum = 0;
-        this.ratings.data.forEach((value, key) => {
+        this.data.data.forEach((value, key) => {
             let idx = key.split(',').map(Number);
 
             let user = idx[0];
             let movie = idx[1];
             let rating = value;
 
-            let predicted_rating = Utils.dot(this.W.getRow(user), this.H.getRow(movie));
+            let predicted_rating = Utils.dot(this.parameters.W.getRow(user), this.parameters.H.getRow(movie));
             let sumTerm = Math.pow(rating - predicted_rating, 2);
             sum += sumTerm;
         });

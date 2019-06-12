@@ -40,17 +40,17 @@ const f2 = function(count, callback) {
     return this.emit('end');
   }
 
-    let paramPartitions = Partitioner.partitionParamsMatrixFactorization(MF.ratings, MF.W, MF.H, MF.workerCount, timestep);
-    let dataPartitions = Partitioner.partitionDataMatrixFactorization(MF.ratings, MF.userCount, MF.movieCount, MF.workerCount);
+    let paramPartitions = Partitioner.partitionParamsMatrixFactorization(MF.data, MF.parameters.W, MF.parameters.H, MF.workerCount, timestep);
+    let dataPartitions = Partitioner.partitionDataMatrixFactorization(MF.data, MF.userCount, MF.movieCount, MF.workerCount);
 
     for(let W_idx = 0; W_idx < MF.workerCount; W_idx++) {
       let job = {};
       let H_idx = (W_idx + timestep) % MF.workerCount;
 
-      job.data_partition = [...dataPartitions[[W_idx, H_idx].toString()]];
-      job.param_partitions = paramPartitions[W_idx];
+      job.data = [...dataPartitions[[W_idx, H_idx].toString()]];
+      job.parameters = paramPartitions[W_idx];
       job.partition = W_idx;
-      job.hyperparameters = {'learningRate': MF.learningRate, 'beta': MF.beta, 'featureCount': MF.featureCount};
+      job.hyperparameters = Object.entries({'learningRate': MF.learningRate, 'beta': MF.beta, 'featureCount': MF.featureCount});
 
       this.emit("data", job);
     }
@@ -71,18 +71,15 @@ const f = function(count, callback) {
 }
 
 // updates the matrix with results, triggers a new timestep if the current one is over
-const handleResult = (data) =>  {
-  let W = Object.create(ParameterMatrix.prototype, Object.getOwnPropertyDescriptors(data.W_partition));
-  W.data = new Float32Array(Object.values(data.W_partition.data));
-
-  let H = Object.create(ParameterMatrix.prototype, Object.getOwnPropertyDescriptors(data.H_partition));
-  H.data = new Float32Array(Object.values(data.H_partition.data));
-
-  MF.W.updateSubset(W);
-  MF.H.updateSubset(H);
+const handleResult = (result) =>  {
+  for(const [key, value] of Object.entries(result.parameters)) {
+    let paramMatrix = Object.create(ParameterMatrix.prototype, Object.getOwnPropertyDescriptors(value));
+    paramMatrix.data = new Float32Array(Object.values(value.data));
+    MF.parameters[key].updateSubset(paramMatrix);
+  }
 
   // current timestep is all processed
-  if(data.partition === MF.workerCount - 1) {
+  if(result.partition === MF.workerCount - 1) {
     e.emit("new timestep");
   }
 };
