@@ -7,12 +7,12 @@ const Utils = require('./Utils');
 class MatrixFactorization {
     constructor() {
 
-      this.userCount = 10;
-      this.movieCount = 8;
-      this.workerCount = 1;
+      this.userCount = 100;
+      this.movieCount = 80;
+      this.workerCount = 3;
 
       this.hyperparameters = {};
-      this.hyperparameters.featureCount = 3;
+      this.hyperparameters.featureCount = 5;
       this.hyperparameters.learningRate = 0.002;
       this.hyperparameters.beta = 0.02;
 

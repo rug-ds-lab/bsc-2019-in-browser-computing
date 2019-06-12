@@ -17,7 +17,6 @@ const loop_body = (e_idx, e_val, parameters) => {
   let beta = initialData.hyperparameters.get('beta');
   let featureCount = initialData.hyperparameters.get('featureCount');
 
-
   let predictedRating = Utils.dotDicts(H.getRow(movie), W.getRow(user));
   let error = rating - predictedRating;
 
@@ -49,7 +48,7 @@ const processChunk = (chunk) => {
    * @param H Parameters in H
    */
 
-  let training_data = new Map(chunk.data);
+  let training_data = initialData.data[chunk.partition.toString()];
 
   let parameters = {};
   for(const [key, value] of Object.entries(chunk.parameters)) {
@@ -91,31 +90,24 @@ copyMap2CPPMap = (map, cppMap) => {
 * @param raw Is the raw string received from the DistributedStream.
 */
 const processChunkWasm = (chunk) => {
-  let training_data = new Map(chunk.data);
-  let hyperparameters = new Map(chunk.hyperparameters);
+  let training_data = initialData.data[chunk.partition.toString()];
 
-  let learningRate = hyperparameters.get('learningRate');
-  let featureCount = hyperparameters.get('featureCount');
-  let beta = hyperparameters.get('beta');
+  let learningRate = initialData.hyperparameters.get('learningRate');
+  let beta = initialData.hyperparameters.get('beta');
+  let featureCount = initialData.hyperparameters.get('featureCount');
 
   let W = ParameterMatrix.parse(chunk.parameters.W);
   let H = ParameterMatrix.parse(chunk.parameters.H);
 
   let vecW = Module.returnVector();
   let vecH = Module.returnVector();
-  // let mapData = Module.returnMapData();
 
   copyTypedArray2CPPVec(W.data, vecW);
   copyTypedArray2CPPVec(H.data, vecH);
-  // copyMap2CPPMap(training_data, mapData);
 
-  console.time('computeUpdatesWasm2');
+  console.time('computeUpdatesWasm');
   training_data.forEach((value, key) => Module.computeUpdate(key, value, vecW, vecH, W.m, W.begin_m, H.m, H.begin_m, featureCount, learningRate, beta));
-  console.timeEnd('computeUpdatesWasm2');
-
-  // console.time('computeUpdatesWasm');
-  // Module.computeUpdates(mapData, vecW, vecH, W.m, W.begin_m, H.m, H.begin_m, featureCount, learningRate, beta);
-  // console.timeEnd('computeUpdatesWasm');
+  console.timeEnd('computeUpdatesWasm');
 
   copyCPPVec2TypedArray(vecW, W.data);
   copyCPPVec2TypedArray(vecH, H.data);
@@ -133,7 +125,10 @@ const processChunkWasm = (chunk) => {
 self.onmessage = (event) => {
   if(event.data.initialData) {
     initialData.hyperparameters = new Map(event.data.initialData.hyperparameters);
-    // initialData.data = new Map(event.data.initialData.data);
+    let dataPartitions = event.data.initialData.data;
+    Object.keys(dataPartitions).map((x) => dataPartitions[x] = new Map(dataPartitions[x]));
+    initialData.data = dataPartitions;
+
     return;
   }
   Module.ready.then(() => {

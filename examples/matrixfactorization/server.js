@@ -4,7 +4,7 @@ const DistributedStream = require('../../src/DistributedStream'),
   socketio = require('socket.io'),
   EventEmitter = require('events'),
   MatrixFactorization = require('./MatrixFactorization'),
-  Partitioner = require('./Partitioner');
+  Partitioner = require('./Partitioner'),
   ParameterMatrix = require('./ParameterMatrix');
 
 
@@ -20,16 +20,19 @@ app.use(express.static(path.join(__dirname, '../../')))
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const MF = new MatrixFactorization(),
-  threshold = 0.001,
-  socket = socketio(httpServer);
+      threshold = 0.001,
+      socket = socketio(httpServer);
 
 let timestep = 0,
-  iteration = 0,
-  lastLoss = 0;
+    iteration = 0,
+    lastLoss = 0;
 
 
 let initialData = {};
-initialData.data = [...MF.data.data];
+let dataPartitions = Partitioner.partitionDataMatrixFactorization(MF.data, MF.userCount, MF.movieCount, MF.workerCount);
+Object.keys(dataPartitions).map((x) => dataPartitions[x] = [...dataPartitions[x]]);
+
+initialData.data = dataPartitions;
 initialData.hyperparameters = Object.entries(MF.hyperparameters);
 
 const distributedStream = new DistributedStream({
@@ -41,24 +44,21 @@ const f2 = function(count, callback) {
   const loss = MF.loss();
   console.log(`Iteration: ${iteration}, Timestep: ${timestep}, Loss: ${loss}`);
 
-  // stop producing partitions if we plateu-ed
-  if(!timestep && Math.abs(loss - lastLoss) < threshold){
-    socket.emit('finish');
-    console.log("Finished.");
-    return this.emit('end');
-  }
+    // stop producing partitions if we plateu-ed
+    if(!timestep && Math.abs(loss - lastLoss) < threshold){
+      socket.emit('finish');
+      console.log("Finished.");
+      return this.emit('end');
+    }
 
     let paramPartitions = Partitioner.partitionParamsMatrixFactorization(MF.data, MF.parameters.W, MF.parameters.H, MF.workerCount, timestep);
-    let dataPartitions = Partitioner.partitionDataMatrixFactorization(MF.data, MF.userCount, MF.movieCount, MF.workerCount);
 
     for(let W_idx = 0; W_idx < MF.workerCount; W_idx++) {
       let job = {};
       let H_idx = (W_idx + timestep) % MF.workerCount;
 
-      job.data = [...dataPartitions[[W_idx, H_idx].toString()]];
       job.parameters = paramPartitions[W_idx];
-      job.partition = W_idx;
-      job.hyperparameters = Object.entries(MF.hyperparameters);
+      job.partition = [W_idx, H_idx];
 
       this.emit("data", job);
     }
@@ -86,14 +86,12 @@ const handleResult = (result) =>  {
   }
 
   // current timestep is all processed
-  if(result.partition === MF.workerCount - 1) {
+  if(result.partition[0] === MF.workerCount - 1) {
     e.emit("new timestep");
   }
 };
 
-// Connect the stream to eachother
-
+// Connect the stream
 es.readable(f).pipe(distributedStream).on("data", handleResult);
 
-// e.emit("new timestep");
 setTimeout(() => e.emit("new timestep"), 100);
