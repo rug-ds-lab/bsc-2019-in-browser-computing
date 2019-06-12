@@ -38,7 +38,7 @@ class Client {
         });
 
         // Run the work function whenever data is received
-        this.socket.on('data', (data, callback) => {
+        this.socket.on('data-distributedstream', (data, callback) => {
             util.debug(this.debug, `Received data from the host: ${JSON.stringify(data)}`);
 
             this.worker.postMessage(data);
