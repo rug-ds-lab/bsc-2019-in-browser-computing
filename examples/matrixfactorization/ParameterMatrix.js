@@ -48,8 +48,6 @@ class ParameterMatrix {
         }
     }
 
-
-
     get(x, y) {
         return this.data[this.idx(x, y)];
     }
@@ -76,4 +74,3 @@ class ParameterMatrix {
 }
 
 module.exports = ParameterMatrix;
-// export default SparseDistArray;

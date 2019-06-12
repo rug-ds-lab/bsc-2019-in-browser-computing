@@ -22,7 +22,7 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 const MF = new MatrixFactorization(),
   threshold = 0.001,
   socket = socketio(httpServer);
-  
+
 let timestep = 0,
   iteration = 0,
   lastLoss = 0;
@@ -72,7 +72,6 @@ const f = function(count, callback) {
 
 // updates the matrix with results, triggers a new timestep if the current one is over
 const handleResult = (data) =>  {
-
   let W = Object.create(ParameterMatrix.prototype, Object.getOwnPropertyDescriptors(data.W_partition));
   W.data = new Float32Array(Object.values(data.W_partition.data));
 

@@ -129,5 +129,5 @@ const processChunkWasm = (chunk) => {
 
 self.onmessage = (event) => {
   Module.ready.then(() => postMessage(event.data.map(processChunkWasm)));
-  postMessage(event.data.map(processChunk));
+  // postMessage(event.data.map(processChunk));
 };
