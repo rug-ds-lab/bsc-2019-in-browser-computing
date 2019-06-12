@@ -3,15 +3,9 @@ self.importScripts("/dist/distributed_stream_Utils.js");
 self.importScripts("/dist/distributed_stream_ParameterMatrix.js");
 self.importScripts("mf_wasm.js");
 
-class Polygon {
-  constructor(height, width) {
-    this.height = height;
-    this.width = width;
-  }
-}
-new Polygon(5, 3);
+let initialData = {};
 
-const loop_body = (e_idx, e_val, parameters, hyperparameters) => {
+const loop_body = (e_idx, e_val, parameters) => {
   let user = e_idx[0];
   let movie = e_idx[1];
   let rating = e_val;
@@ -19,17 +13,22 @@ const loop_body = (e_idx, e_val, parameters, hyperparameters) => {
   let W = parameters.W;
   let H = parameters.H;
 
+  let learningRate = initialData.hyperparameters.get('learningRate');
+  let beta = initialData.hyperparameters.get('beta');
+  let featureCount = initialData.hyperparameters.get('featureCount');
+
+
   let predictedRating = Utils.dotDicts(H.getRow(movie), W.getRow(user));
   let error = rating - predictedRating;
 
   // Iterate over features
-  for(let idx_f = 0; idx_f < hyperparameters.get('featureCount'); idx_f++) {
+  for(let idx_f = 0; idx_f < featureCount; idx_f++) {
       let updatedW = W.get(user, idx_f) +
-        hyperparameters.get('learningRate') * (2 * error * H.get(movie, idx_f) - hyperparameters.get('beta') * W.get(user, idx_f));
+      learningRate * (2 * error * H.get(movie, idx_f) - beta * W.get(user, idx_f));
       W.update(user, idx_f, updatedW);
 
       let updatedH = H.get(movie, idx_f) +
-        hyperparameters.get('learningRate') * (2 * error * W.get(user, idx_f) - hyperparameters.get('beta') * H.get(movie, idx_f));
+      learningRate * (2 * error * W.get(user, idx_f) - beta * H.get(movie, idx_f));
       H.update(movie, idx_f, updatedH);
   }
 }
@@ -51,7 +50,6 @@ const processChunk = (chunk) => {
    */
 
   let training_data = new Map(chunk.data);
-  let hyperparameters = new Map(chunk.hyperparameters);
 
   let parameters = {};
   for(const [key, value] of Object.entries(chunk.parameters)) {
@@ -59,7 +57,7 @@ const processChunk = (chunk) => {
   }
 
   console.time('computeUpdatesJS');
-  training_data.forEach((value, key) => loop_body(key.split(',').map(Number), value, parameters, hyperparameters));
+  training_data.forEach((value, key) => loop_body(key.split(',').map(Number), value, parameters));
   console.timeEnd('computeUpdatesJS');
 
   let output = {};
@@ -133,7 +131,11 @@ const processChunkWasm = (chunk) => {
 
 
 self.onmessage = (event) => {
-
+  if(event.data.initialData) {
+    initialData.hyperparameters = new Map(event.data.initialData.hyperparameters);
+    // initialData.data = new Map(event.data.initialData.data);
+    return;
+  }
   Module.ready.then(() => {
     console.time('computeUpdatesWasmTotal');
     postMessage(event.data.map(processChunkWasm))

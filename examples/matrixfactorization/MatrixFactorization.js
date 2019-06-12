@@ -6,19 +6,22 @@ const Utils = require('./Utils');
 
 class MatrixFactorization {
     constructor() {
-      this.userCount = 100;
-      this.movieCount = 80;
-      this.featureCount = 3;
+
+      this.userCount = 10;
+      this.movieCount = 8;
       this.workerCount = 1;
 
-      this.learningRate = 0.002;
-      this.beta = 0.02;
+      this.hyperparameters = {};
+      this.hyperparameters.featureCount = 3;
+      this.hyperparameters.learningRate = 0.002;
+      this.hyperparameters.beta = 0.02;
 
       this.data = this.generateRandomNetflixDataset(0.6, this.movieCount, this.userCount);
+
       this.parameters = {};
-      this.parameters.W = new ParameterMatrix(this.userCount, this.featureCount);
+      this.parameters.W = new ParameterMatrix(this.userCount, this.hyperparameters.featureCount);
       this.parameters.W.randomize();
-      this.parameters.H = new ParameterMatrix(this.movieCount, this.featureCount);
+      this.parameters.H = new ParameterMatrix(this.movieCount, this.hyperparameters.featureCount);
       this.parameters.H.randomize();
     }
 
@@ -55,7 +58,7 @@ class MatrixFactorization {
     }
 
     loop_body() {
-        
+
     }
 
     algorithm() {

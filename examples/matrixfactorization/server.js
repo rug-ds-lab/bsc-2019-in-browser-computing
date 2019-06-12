@@ -27,7 +27,15 @@ let timestep = 0,
   iteration = 0,
   lastLoss = 0;
 
-const distributedStream = new DistributedStream({socket});
+
+let initialData = {};
+initialData.data = [...MF.data.data];
+initialData.hyperparameters = Object.entries(MF.hyperparameters);
+
+const distributedStream = new DistributedStream({
+  socket,
+  initialData
+});
 
 const f2 = function(count, callback) {
   const loss = MF.loss();
@@ -50,7 +58,7 @@ const f2 = function(count, callback) {
       job.data = [...dataPartitions[[W_idx, H_idx].toString()]];
       job.parameters = paramPartitions[W_idx];
       job.partition = W_idx;
-      job.hyperparameters = Object.entries({'learningRate': MF.learningRate, 'beta': MF.beta, 'featureCount': MF.featureCount});
+      job.hyperparameters = Object.entries(MF.hyperparameters);
 
       this.emit("data", job);
     }

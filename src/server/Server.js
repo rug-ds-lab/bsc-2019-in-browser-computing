@@ -2,7 +2,7 @@ const EventEmitter = require('events'),
     util = require('../Utilities.js');
 
 class Server extends EventEmitter {
-    constructor({socket, port}){
+    constructor({socket, port, initialData}){
         super();
 
         this.port = port;
@@ -11,6 +11,9 @@ class Server extends EventEmitter {
         this.allDataHasBeenProcessed = false;
 
         socket.on('connection', client => {
+            if(initialData){
+                socket.emit('initial-data-distributedstream', initialData);
+            }
             this.emit('connection', client);
             this.emit('client-available', client);
         });

@@ -15,7 +15,6 @@ class DistributedStream extends stream.Duplex {
      * @param {Boolean} [opt.debug=false] Debug mode
      * @param {Number} [opt.highWaterMark=100] Maximum number of data batches to put into the stream at once
      * @param {Number} [opt.redundancy=1] Redundancy factor used for the voting algorithm. Defaults to no redundancy
-     * @param {Function} [opt.equalityFunction] The function used to compare if two results are the same
      * @param {Server} [socket] https://socket.io/docs/server-api/#Server
      * @param {Number} [opt.port=3000] Effective only if no opt.httpServer is passed.
      * @param {Object} [opt.distribution] The type of load distribution requested;
@@ -24,17 +23,14 @@ class DistributedStream extends stream.Duplex {
      * @param {Number} [opt.distribution.size=1] Chunk sizes for the load distribution if chunk was selected as type
      */
     constructor({
-        debug = false,
-        port = 3000,
-        highWaterMark = 100,
-        redundancy = 1,
-        equalityFunction = ((obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2)),
+        debug=false,
+        port=3000,
+        highWaterMark=100,
+        redundancy=1,
         socket,
-        distribution = {
-            type: "chunk",
-            size: 100
-        }
-    } = {}) {
+        distribution={type:"chunk", size:100},
+        initialData
+        }={}) {
 
         super({
             objectMode: true,
@@ -52,10 +48,7 @@ class DistributedStream extends stream.Duplex {
         /** count of data pieces written to the stream */
         this.writtenCount = 0;
 
-        this.dataHandler = new DataHandler({
-                equalityFunction,
-                redundancy
-            })
+        this.dataHandler = new DataHandler({redundancy})
             .on("processed", this._putIntoStream.bind(this));
 
         this.clientManager = new ClientManager()
@@ -63,10 +56,7 @@ class DistributedStream extends stream.Duplex {
 
         this.loadBalancer = new LoadBalancer(this.clientManager, distribution);
 
-        this.server = new Server({
-                socket,
-                port
-            })
+        this.server = new Server({socket, port, initialData})
             .on("connection", this.loadBalancer.initializeClient.bind(this.loadBalancer))
             .on("connection", this.clientManager.addClient.bind(this.clientManager))
             .on("result", this.dataHandler.handleResult.bind(this.dataHandler))

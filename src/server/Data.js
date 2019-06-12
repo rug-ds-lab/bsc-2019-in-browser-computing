@@ -1,9 +1,8 @@
 class Data{
-  constructor({data, order, redundancy, equalityFunction}){
+  constructor({data, order, redundancy}){
     this.data = data;
     this.order = order;
     this.redundancy = redundancy;
-    this.equalityFunction = equalityFunction;
 
     this.results = []; // objects with data, count keys
     this.voters = []; // clients that are processing/processed this data
@@ -33,7 +32,7 @@ class Data{
   }
 
   canVote(client){
-    return !this.voters.find(el => el.id === client.id);
+    return this.shouldBeSent() && !this.voters.find(el => el.id === client.id);
   }
 
   getMajorityResult(){
@@ -43,7 +42,7 @@ class Data{
   addResult(result){
     this.currentProcessorCount--;
 
-    let res = this.results.find((el) => this.equalityFunction(el.data, result));
+    let res = this.results.find((el) => JSON.stringify(el.data) === JSON.stringify(result));
     if(res){
       res.count++;
     } else {

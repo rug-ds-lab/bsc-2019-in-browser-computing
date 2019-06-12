@@ -1,11 +1,11 @@
 const EventEmitter = require('events'),
-    Data = require('./Data.js');
+    Data = require('./Data.js'),
+    SortedArray = require('../SortedArray.js');
 
 class DataHandler extends EventEmitter {
-    constructor({equalityFunction, redundancy}){
+    constructor({redundancy}){
         super();
 
-        this.equalityFunction = equalityFunction;
         this.redundancy = redundancy;
 
         /**
@@ -23,16 +23,15 @@ class DataHandler extends EventEmitter {
 
         /**
          * Buffers for data pieces that:
-         *  - can be sent to a suitable worker right away.
-         *  - are currently being processed by enough workers.
+         *  - isn't done with processing yet (but it might be being processed by enough workers atm)
          *  - are totally processed, but not written to the stream yet. The key is the read order.
          * 
          *  Also stores the data/client pair that should be sent the next
          *  in an object that is {client, data}.
          */
         this.data = new Map();
-        this.canBeSent = [];
-        this.processed = []; // TODO: Keep sorted!!!
+        this.waiting = new SortedArray();
+        this.processed = new SortedArray();
     }
 
     /**
@@ -45,12 +44,11 @@ class DataHandler extends EventEmitter {
 
         this.data.set(order, new Data({
             data,
-            order, //TODO: Is necessary?
-            redundancy: this.redundancy,
-            equalityFunction: this.equalityFunction
+            order,
+            redundancy: this.redundancy
         }));
 
-        this.canBeSent.push(order)
+        this.waiting.add(order)
         this.emit("new-data");
     }
 
@@ -62,10 +60,8 @@ class DataHandler extends EventEmitter {
     removeVote(client){
         client.data.forEach((order) => {
             this.data.get(order).removeVoter(client);
-            if(this.canBeSent.indexOf(order) === -1){ // TODO: Better way?
-                this.canBeSent.unshift(order);
-            }
         });
+        this.emit("new-data");
     }
 
     handleResult(data, result){
@@ -73,8 +69,9 @@ class DataHandler extends EventEmitter {
 
         // if done with processing this piece, move it to the processed buffer
         if(data.doneWithProcessing()){
-            this.processed.push(data.order);
+            this.processed.add(data.order);
             this.counts.processed++;
+            this.waiting.remove(data.order);
             this.emit("processed");
         }
     }
@@ -96,21 +93,17 @@ class DataHandler extends EventEmitter {
         const datas = [];
 
         // get data the client can vote for, up to the given count
-        for(let i=0; i<this.canBeSent.length && datas.length < count; i++){
-            const order = this.canBeSent[i];
+        for(let order of this.waiting.generator()){
+            if(datas.length === count){
+                break;
+            }
 
-            if(this.data.get(order).canVote(client)){
+            const data = this.data.get(order);
+
+            if(data.canVote(client)){
                 client.data.add(order);
-
-                const data = this.data.get(order);
-
                 datas.push(data);
                 data.addVoter(client);
-                // if we don't need to send this anymore, do book keeping
-                if(!data.shouldBeSent()){
-                    this.canBeSent.splice(i,1);
-                    i--;
-                }
             }
         }
 
@@ -123,15 +116,13 @@ class DataHandler extends EventEmitter {
     }
 
     popProcessed(order){
-        //TODO: Make this efficient by adding sorted arrays
-        let index;
-
         // no more data left, put null to the stream to close it
         if(this.isProcessingFinished() && !this.data.size){
             return null;
         }
 
-        if((index = this.processed.indexOf(order)) === -1){
+        // the requested data isn't processed yet
+        if(!this.processed.has(order)){
             return undefined;
         }
 
@@ -139,7 +130,7 @@ class DataHandler extends EventEmitter {
 
         // remove this data piece from everywhere
         this.data.delete(order);
-        this.processed.splice(index, 1);
+        this.processed.remove(order);
 
         return data;
     }
