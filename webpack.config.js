@@ -2,11 +2,16 @@ var path = require('path');
 
 module.exports = {
   mode: 'production',
-  entry: './src/client/Client.js',
+  entry: {
+    Client: './src/client/Client.js',
+    Utils: './examples/matrixfactorization/Utils.js',
+    SparseDistArray: './examples/matrixfactorization/SparseDistArray.js',
+    ParameterMatrix: './examples/matrixfactorization/ParameterMatrix.js'
+  },
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'distributed_stream_client.js',
-    library: 'Client'
+    filename: 'distributed_stream_[name].js',
+    library: '[name]'
   },
   module: {
     rules: [

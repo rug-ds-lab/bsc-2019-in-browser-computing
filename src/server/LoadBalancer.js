@@ -21,7 +21,7 @@ class LoadBalancer {
          * 
          * @param {Number} size 
          */
-        const chunk = (size=this.distribution.size) => {
+        const chunk = (size = this.distribution.size) => {
             return size;
         }
 
@@ -32,17 +32,21 @@ class LoadBalancer {
          * @param {Socket} client
          */
         const adaptive = (client) => {
-            const {lastDataCount, lastResponseTime, lastSendTime} = client.load;
+            const {
+                lastDataCount,
+                lastResponseTime,
+                lastSendTime
+            } = client.load;
             const averageResponseTime = this.averageResponseTime();
 
-            if(!lastDataCount || !averageResponseTime){
+            if (!lastDataCount || !averageResponseTime) {
                 return chunk();
             }
             const avgClientTimePerTask = (lastResponseTime - lastSendTime) / lastDataCount;
             const missedTasks = (averageResponseTime - avgClientTimePerTask) * lastDataCount;
             const deltaLoad = missedTasks / avgClientTimePerTask;
             let res = Math.ceil(deltaLoad + lastDataCount);
-            if(res < 0){
+            if (res < 0) {
                 res = lastDataCount;
             }
             return res;
@@ -68,14 +72,14 @@ class LoadBalancer {
         let totalAverage = 0;
 
         this.clientManager.clients.forEach(client => {
-            if(!client.load.lastResponseTime){
+            if (!client.load.lastResponseTime) {
                 return;
             }
-            totalAverage += (client.load.lastResponseTime - client.load.lastSendTime)/client.load.lastDataCount;
+            totalAverage += (client.load.lastResponseTime - client.load.lastSendTime) / client.load.lastDataCount;
             count++;
         });
 
-        return count ? totalAverage/count : 0;
+        return count ? totalAverage / count : 0;
     }
 
     /**
@@ -98,7 +102,7 @@ class LoadBalancer {
         if (!Object.keys(object).length) util.error(error, from);
     }
 
-    initializeClient(client){
+    initializeClient(client) {
         client.load = {
             lastResponseTime: 0,
             lastDataCount: 0,

@@ -16,7 +16,7 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 const distributedStream = new DistributedStream({socket});
 
 // Read from the file line by line, direct into the distributed stream, print
-fs.createReadStream('password_list.txt')
+fs.createReadStream(path.join(__dirname, 'password_list.txt'))
   .pipe(es.split())
   .pipe(distributedStream)
   .pipe(es.stringify())

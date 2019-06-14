@@ -20,7 +20,7 @@ class DistributedStream extends stream.Duplex {
      * @param {Object} [opt.distribution] The type of load distribution requested;
      * @param {String} [opt.distribution.type="chunk"] The type of load distribution server should provide.
      *        Can be `adaptive`, `single` or `chunk` (default)
-     * @param {Number} [opt.distribution.size=100] Chunk sizes for the load distribution if chunk was selected as type
+     * @param {Number} [opt.distribution.size=1] Chunk sizes for the load distribution if chunk was selected as type
      */
     constructor({
         debug=false,
@@ -32,9 +32,12 @@ class DistributedStream extends stream.Duplex {
         initialData
         }={}) {
 
-        super({objectMode: true, highWaterMark: highWaterMark});
+        super({
+            objectMode: true,
+            highWaterMark: highWaterMark
+        });
 
-        if(!socket){
+        if (!socket) {
             throw new Error('socket is required');
         }
 
@@ -64,7 +67,7 @@ class DistributedStream extends stream.Duplex {
      * Called by the stream implementation to indicate this stream should start/resume 
      * producing and pushing data.
      */
-    _read(){
+    _read() {
         this.backPressure = false;
         this.emit("resume");
     }
@@ -72,7 +75,7 @@ class DistributedStream extends stream.Duplex {
     /**
      * Called by the stream implementation when new data is written into this stream.
      */
-    _write(data, _encoding, callback){
+    _write(data, _encoding, callback) {
         this.dataHandler.addData(data);
         callback();
     }
@@ -81,19 +84,19 @@ class DistributedStream extends stream.Duplex {
      * Called by the stream implementation when data writing into this stream is finished.
      * @param {Function} callback 
      */
-    _final(callback){
+    _final(callback) {
         this.dataHandler.endOfData();
         callback();
     }
 
     // when called, coordinates the sending of a new batch
-    _sendJob(client){
-        if(this.dataHandler.isProcessingFinished()){
+    _sendJob(client) {
+        if (this.dataHandler.isProcessingFinished()) {
             return;
         }
 
         // wait if there is backpressure
-        if(this.backPressure){
+        if (this.backPressure) {
             return this.once("resume", this._sendJob.bind(this, client));
         }
 
@@ -111,7 +114,7 @@ class DistributedStream extends stream.Duplex {
      * All data should be written to the stream in the order it was read, so a data group
      * can be written only if the data group read one before was written into stream already.
      */
-    _putIntoStream(){
+    _putIntoStream() {
         let processedData;
 
         while(!this.backPressure && (processedData = this.dataHandler.popProcessed(this.writtenCount)) !== undefined){
