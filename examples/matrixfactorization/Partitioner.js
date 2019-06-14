@@ -2,44 +2,63 @@ const Utils = require('./Utils.js');
 
 class Partitioner {
 
-    static partitionDummy(iteration_space, dvecs, worker_count, user_count, movie_count, feature_count) {
-        // Dependence vector(0,∞) means that any iteration(p′1,p′2) depends on iteration (p1,p2) as long as p′1−p1==0.
+    static partitionDataMatrixFactorization(data, userCount, movieCount, workerCount) {
+        let dataPartitions = {};
 
-        let data = iteration_space[0];
-        let W = iteration_space[1];
-        let H = iteration_space[2];
+        let chunksUsers = Utils.chunkBeginEnd(userCount, workerCount);
+        let chunksMovies = Utils.chunkBeginEnd(movieCount, workerCount);
 
-        // console.log(W.data.length);
+        data.data.forEach((value, key) => {
+            let idx = key.split(',').map(Number);
 
-        // console.log(data);
-        let chunksUsers = Utils.chunkBeginEnd(user_count, worker_count);
-        let chunksMovies = Utils.chunkBeginEnd(movie_count, worker_count);
+            let user = idx[0];
+            let movie = idx[1];
+
+            let userPartition = -1;
+            let moviePartition = -1;
+
+            for(let idx = 0; idx < workerCount; idx++) {
+                if(user >= chunksUsers[idx][0] && user <= chunksUsers[idx][1]) {
+                    userPartition = idx;
+                    break;
+                }
+            }
+            for(let idx = 0; idx < workerCount; idx++) {
+                if(movie >= chunksMovies[idx][0] && movie <= chunksMovies[idx][1]) {
+                    moviePartition = idx;
+                    break;
+                }
+            }
+            let nKey = [userPartition, moviePartition].toString();
+            if(!(nKey in dataPartitions)) {
+                dataPartitions[nKey] = new Map();
+            }
+            dataPartitions[nKey].set(key, value);
+
+        });
+        return dataPartitions;
+    }
+
+    static partitionParamsMatrixFactorization(data, W, H, workerCount, timestep) {
+        let userCount = W.m;
+        let movieCount = H.m;
+        let featureCount = W.n;
+
+        let chunksUsers = Utils.chunkBeginEnd(userCount, workerCount);
+        let chunksMovies = Utils.chunkBeginEnd(movieCount, workerCount);
 
         let partitions = [];
-        // Necessary to do this in <worker_count> amount of time steps.
-        for(let timestep = 0; timestep < worker_count; timestep++) {
 
-            let partition = {};
-            partition['timestep'] = timestep;
-            partition['parts'] = [];
-            for(let idx = 0; idx < worker_count; idx++) {
-                let partition_part = {};
+        for(let W_idx = 0; W_idx < workerCount; W_idx++) {
+            let part = {};
 
-                let i = (idx + timestep) % worker_count;
+            let H_idx = (W_idx + timestep) % workerCount;
 
-                let data_partition = data.getSubset([chunksUsers[i], chunksMovies[idx]]);
-                let W_partition = W.getRows(chunksUsers[i][0], chunksUsers[i][1]);
-                let H_partition = H.getRows(chunksMovies[idx][0], chunksMovies[idx][1]);
+            part.W = W.getRows(chunksUsers[W_idx][0], chunksUsers[W_idx][1]);
+            part.H = H.getRows(chunksMovies[H_idx][0], chunksMovies[H_idx][1]);
 
-                partition_part['data_partition'] = data_partition;
-                partition_part['W_partition'] = W_partition;
-                partition_part['H_partition'] = H_partition;
-                partition['parts'].push(partition_part);
-            }
-            partitions.push(partition);
+            partitions.push(part);
         }
-
-
         return partitions;
     }
 }

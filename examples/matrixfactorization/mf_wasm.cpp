@@ -66,39 +66,45 @@ size_t getIdx(size_t x, size_t y, size_t size_x, size_t size_y)
   return x * size_y + y;
 }
 
-void computeUpdates(std::map<std::string, float> &data, std::vector<float> &W, std::vector<float> &H, size_t userCount, size_t movieCount, size_t featureCount) {
-    float learningRate = 0.002;
-    float beta = 0.02;
-    // std::cout << "Data:" << data.size() << "\n";
+void computeUpdate(std::string key, float val, std::vector<float> &W, std::vector<float> &H, size_t userCount, size_t userBegin_m, size_t movieCount, size_t movieBegin_m, size_t featureCount, float learningRate, float beta)
+{
+  std::vector<size_t> keys = split(key, ',');
+  size_t const user = keys[0] - userBegin_m;
+  size_t const movie = keys[1] - movieBegin_m;
+  float const rating = val;
 
+  auto rowW = getRow(W, featureCount, getIdx(user, 0, userCount, featureCount));
+  auto rowH = getRow(H, featureCount, getIdx(movie, 0, movieCount, featureCount));
+
+  float predictedRating = dot(rowH, rowW);
+  float error = rating - predictedRating;
+
+  for(size_t idx_f = 0; idx_f < featureCount; idx_f++)
+  {
+    float updatedW = W[getIdx(user, idx_f, userCount, featureCount)] +
+      learningRate * (2.0f * error * H[getIdx(movie, idx_f, movieCount, featureCount)] - beta * W[getIdx(user, idx_f, userCount, featureCount)]);
+    W[getIdx(user, idx_f, userCount, featureCount)] = updatedW;
+
+    float updatedH = H[getIdx(movie, idx_f, movieCount, featureCount)] +
+      learningRate * (2.0f * error * W[getIdx(user, idx_f, userCount, featureCount)] - beta * H[getIdx(movie, idx_f, movieCount, featureCount)]);
+    H[getIdx(movie, idx_f, movieCount, featureCount)] = updatedH;
+  }
+}
+
+void computeUpdates(std::map<std::string, float> &data, std::vector<float> &W, std::vector<float> &H, size_t userCount, size_t userBegin_m, size_t movieCount, size_t movieBegin_m, size_t featureCount, float learningRate, float beta) {
     for( auto const& [key, val] : data)
     {
-        // std::cout << "Iterating over datapoint:" << key << ", " << val << std::endl;
-
         std::vector<size_t> keys = split(key, ',');
-        size_t const user = keys[0];
-        size_t const movie = keys[1];
+        size_t const user = keys[0] - userBegin_m;
+        size_t const movie = keys[1] - movieBegin_m;
         float const rating = val;
 
         auto rowW = getRow(W, featureCount, getIdx(user, 0, userCount, featureCount));
         auto rowH = getRow(H, featureCount, getIdx(movie, 0, movieCount, featureCount));
-        // std::cout << "RowSizeW: " << rowW.size() << std::endl;
-        // std::cout << "RowSizeH: " << rowH.size() << std::endl;
 
         float predictedRating = dot(rowH, rowW);
         float error = rating - predictedRating;
 
-        // std::cout << "Error:" << error << std::endl;
-
-        // for(size_t idx = 0; idx < rowH.size(); idx++)
-        // {
-        // std::cout << "Pred rating: " << predictedRating << ",\trating: " << rating << std::endl;
-        // }
-
-
-        // std::cout << "Error:" << error << std::endl;
-
-        // asf
         for(size_t idx_f = 0; idx_f < featureCount; idx_f++)
         {
           float updatedW = W[getIdx(user, idx_f, userCount, featureCount)] +
@@ -117,6 +123,7 @@ EMSCRIPTEN_BINDINGS(my_module) {
     function("returnVector", &returnVector);
     function("printMap", &printMap);
 
+    function("computeUpdate", &computeUpdate);
     function("computeUpdates", &computeUpdates);
 
     register_vector<float>("VectorFloat");

@@ -1,4 +1,3 @@
-// const DataProvider = require('./DataProvider');
 const SparseDistArray = require('./SparseDistArray');
 const ParameterMatrix = require('./ParameterMatrix');
 
@@ -7,54 +6,48 @@ const Utils = require('./Utils');
 
 class MatrixFactorization {
     constructor() {
-      this.userCount = 1000;
-      this.movieCount = 800;
-      this.featureCount = 15;
-      this.workerCount = 1;
 
-      this.ratings = this.generateRandomSparseData(0.6, this.movieCount, this.userCount);
+      this.userCount = 100;
+      this.movieCount = 80;
+      this.workerCount = 3;
 
-      this.W = new ParameterMatrix(this.userCount, this.featureCount);
-      this.W.randomize();
-      this.H = new ParameterMatrix(this.movieCount, this.featureCount);
-      this.H.randomize();
+      this.hyperparameters = {};
+      this.hyperparameters.featureCount = 5;
+      this.hyperparameters.learningRate = 0.002;
+      this.hyperparameters.beta = 0.02;
 
-    //   console.log(this.H.data);
+      this.data = this.generateRandomNetflixDataset(0.6, this.movieCount, this.userCount);
 
-    //   this.W = new SparseDistArray(2);
-    //   this.W.randomize(this.userCount, this.featureCount);
-    //   this.H = new SparseDistArray(2);
-    //   this.H.randomize(this.movieCount, this.featureCount);
+      this.parameters = {};
+      this.parameters.W = new ParameterMatrix(this.userCount, this.hyperparameters.featureCount);
+      this.parameters.W.randomize();
+      this.parameters.H = new ParameterMatrix(this.movieCount, this.hyperparameters.featureCount);
+      this.parameters.H.randomize();
     }
 
-  /**
-   * Computes the current error in using the parameter arrays (this.W and this.H) and the training data (this.ratings).
-   */
+    /**
+     * Computes the current error in using the parameter arrays (this.W and this.H) and the training data (this.ratings).
+     */
     loss() {
-        // Nonzero loss function
         let sum = 0;
-        let users = Object.keys(this.ratings.data);
-        for(let idx_m = 0; idx_m < users.length; idx_m++) {
-            let user = users[idx_m];
-            let movies = Object.keys(this.ratings.data[user]);
-            for(let idx_n = 0; idx_n < movies.length; idx_n++) {
-                let movie = movies[idx_n];
-                let rating = this.ratings.data[user][movie];
-                // console.log("User", user, " gave movie", movie, " a rating of", rating);
-                // console.log(this.H.getRow(movie));
-                let predicted_rating = Utils.dot(this.H.getRow(movie), this.W.getRow(user));
+        this.data.data.forEach((value, key) => {
+            let idx = key.split(',').map(Number);
 
-                let sumTerm = Math.pow(rating - predicted_rating, 2);
-                sum += sumTerm;
-            }
-        }
+            let user = idx[0];
+            let movie = idx[1];
+            let rating = value;
+
+            let predicted_rating = Utils.dot(this.parameters.W.getRow(user), this.parameters.H.getRow(movie));
+            let sumTerm = Math.pow(rating - predicted_rating, 2);
+            sum += sumTerm;
+        });
         return sum;
     }
 
-    generateRandomSparseData(alpha, movieCount, usersCount) {
-        let data = new SparseDistArray(2);
-        for (var idx_m = 0; idx_m < movieCount; idx_m++) {
-            for (var idx_u = 0; idx_u < usersCount; idx_u++) {
+    generateRandomNetflixDataset(alpha, movieCount, usersCount) {
+        let data = new SparseDistArray();
+        for (var idx_u = 0; idx_u < usersCount; idx_u++) {
+            for (var idx_m = 0; idx_m < movieCount; idx_m++) {
                 if(Math.random() < alpha) {
                     let rating = Math.floor(Math.random() * 5 + 1);
                     data.add(idx_u, idx_m, rating);
@@ -62,6 +55,20 @@ class MatrixFactorization {
             }
         }
         return data;
+    }
+
+    loop_body() {
+
+    }
+
+    algorithm() {
+        // while(diffLoss > 10) {
+        //     for(data in this.data) {
+        //         loop_body() {
+
+        //         }
+        //     }
+        // }
     }
 }
 

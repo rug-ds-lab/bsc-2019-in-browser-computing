@@ -11,8 +11,6 @@ class ParameterMatrix {
     }
 
     idx(x, y) {
-        // x = x % this.m;
-        // y = y % this.n;
         x = x - this.begin_m;
         y = y - this.begin_n;
         return x * this.n + y;
@@ -21,7 +19,7 @@ class ParameterMatrix {
     randomize() {
         for(let idx_m = 0; idx_m < this.m; idx_m++) {
             for(let idx_n = 0; idx_n < this.n; idx_n++) {
-                this.data[this.idx(idx_m, idx_n)] = Math.random();
+                this.data[this.idx(idx_m, idx_n)] = (Math.random() - 0.5) * 2.0;
             }
         }
     }
@@ -40,13 +38,12 @@ class ParameterMatrix {
         });
     }
 
-    updateSubset(updatedVals, m, n, p, q) {
-        // console.log(updatedVals);
-        for(let idx1 = m; idx1 < n; idx1++) {
-            for(let idx2 = p; idx2 < q; idx2++) {
-                // console.log(idx1, m, idx2, n);
-                // console.log(updatedVals.data[this.idx(idx1 - m, idx2 - p)]);
-                this.data[this.idx(idx1, idx2)] = updatedVals.data[this.idx(idx1 - m, idx2 - p)];
+    updateSubset(updatedVals) {
+        for(let idx1 = 0; idx1 < updatedVals.m; idx1++) {
+            for(let idx2 = 0; idx2 < updatedVals.n; idx2++) {
+                let x = idx1 + updatedVals.begin_m;
+                let y = idx2 + updatedVals.begin_n;
+                this.data[this.idx(x, y)] = updatedVals.data[updatedVals.idx(x, y)];
             }
         }
     }
@@ -56,19 +53,13 @@ class ParameterMatrix {
     }
 
     getRow(m) {
-        // console.log("Getting row");
-
         let idx = this.idx(m, 0);
-        // console.log(this.data);
-        // console.log("GetRow with", m, " idx becomes:", idx);
-        // console.log(idx);
         return this.data.slice(idx, idx + this.n);
     }
 
     getRows(m, n) {
         let idx_m = this.idx(m, 0);
         let idx_n = this.idx(n + 1, 0);
-        // console.log("Slicing", idx_m, idx_n);
         let rows = new ParameterMatrix(n + 1 - m, this.n);
         rows.data = this.data.slice(idx_m, idx_n);
         rows.begin_m = m;
@@ -80,7 +71,12 @@ class ParameterMatrix {
     size() {
         return this.data.length;
     }
+
+    static parse(serializedParameterMatrix) {
+        let paramMatrix = Object.create(ParameterMatrix.prototype, Object.getOwnPropertyDescriptors(serializedParameterMatrix));
+        paramMatrix.data = new Float32Array(Object.values(serializedParameterMatrix.data));
+        return paramMatrix;
+    }
 }
 
 module.exports = ParameterMatrix;
-// export default SparseDistArray;
