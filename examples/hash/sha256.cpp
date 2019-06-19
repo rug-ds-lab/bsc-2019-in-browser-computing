@@ -135,7 +135,7 @@ std::string sha256(std::string input)
 }
 
 std::string sha256repeated(std::string input){
-    for(int i=0;i<500;i++){
+    for(int i=0;i<5000;i++){
         input = sha256(input);
     }
     return input;

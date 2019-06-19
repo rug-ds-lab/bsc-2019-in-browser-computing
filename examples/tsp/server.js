@@ -24,7 +24,8 @@ const permutationStream = es.readable(function(_count, callback){
 
 const distributedStream = new DistributedStream({
   socket: socketio(httpServer),
-  initialData: ts.distances
+  initialData: ts.distances,
+  distribution: {size:500, type:"chunk"}
 });
 
 let shortest = {distance:999999999};

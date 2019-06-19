@@ -1,7 +1,7 @@
 self.importScripts("/dist/distributed_stream_SparseDistArray.js");
 self.importScripts("/dist/distributed_stream_Utils.js");
 self.importScripts("/dist/distributed_stream_ParameterMatrix.js");
-self.importScripts("mf_wasm.js");
+// self.importScripts("mf_wasm.js");
 
 let initialData = {};
 
@@ -131,13 +131,13 @@ self.onmessage = (event) => {
 
     return;
   }
-  Module.ready.then(() => {
-    console.time('computeUpdatesWasmTotal');
-    postMessage(event.data.map(processChunkWasm))
-    console.timeEnd('computeUpdatesWasmTotal');
-  });
-  // console.time('computeUpdatesJSTotal');
-  // postMessage(event.data.map(processChunk));
-  // console.timeEnd('computeUpdatesJSTotal');
+  // Module.ready.then(() => {
+  //   console.time('computeUpdatesWasmTotal');
+  //   postMessage(event.data.map(processChunkWasm))
+  //   console.timeEnd('computeUpdatesWasmTotal');
+  // });
+  console.time('computeUpdatesJSTotal');
+  postMessage(event.data.map(processChunk));
+  console.timeEnd('computeUpdatesJSTotal');
 
 };

@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: server
-        image: eu.gcr.io/tutorial-243616/server:v2
+        image: eu.gcr.io/tutorial-243616/server:tsp4
         ports:
         - containerPort: 3000
           name: http

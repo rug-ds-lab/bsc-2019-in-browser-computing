@@ -20,6 +20,7 @@ class ClientManager extends EventEmitter{
    * @param {Socket} client See https://socket.io/docs/server-api/#Socket
    */
   addClient(client){
+    console.log("NEW CLIENT");
     client.data = new Set();
     this.clients.add(client);
     client.on("disconnect", this.removeClient.bind(this, client));

@@ -42,6 +42,8 @@ class DistributedStream extends stream.Duplex {
         }
 
         this.debug = debug;
+        this.wait = true;
+        this.maxClients = 4;
 
         this.backPressure = true; // don't start sending jobs until _read is called
 
@@ -91,12 +93,18 @@ class DistributedStream extends stream.Duplex {
 
     // when called, coordinates the sending of a new batch
     _sendJob(client) {
+        console.log(1);
+        if(this.wait && this.clientManager.clients.size === this.maxClients){
+            this.wait = false;
+            console.time();
+        }
+
         if (this.dataHandler.isProcessingFinished()) {
             return;
         }
 
         // wait if there is backpressure
-        if (this.backPressure) {
+        if (this.backPressure || this.wait) {
             return this.once("resume", this._sendJob.bind(this, client));
         }
 
@@ -120,6 +128,8 @@ class DistributedStream extends stream.Duplex {
         while(!this.backPressure && (processedData = this.dataHandler.popProcessed(this.writtenCount)) !== undefined){
             if(processedData){ // can be null to imply the end of results
                 processedData = processedData.getMajorityResult();
+            } else {
+                console.timeEnd();
             }
 
             // this.push returning false implied backpressure
