@@ -45,10 +45,10 @@ class DistributedStream extends stream.Duplex {
         /** count of data pieces written to the stream */
         this.writtenCount = 0;
 
-        this.dataHandler = new DataHandler({redundancy})
+        this.dataHandler = new DataHandler({debug, redundancy})
             .on("processed", this._putIntoStream.bind(this));
 
-        this.clientManager = new ClientManager()
+        this.clientManager = new ClientManager(debug)
             .on("disconnection", this.dataHandler.removeVote.bind(this.dataHandler));
 
         this.loadBalancer = new LoadBalancer(this.clientManager, distribution);
@@ -83,6 +83,7 @@ class DistributedStream extends stream.Duplex {
      */
     _final(callback){
         this.dataHandler.endOfData();
+        util.debug(this.debug, "Finished reading data into the stream");
         callback();
     }
 
@@ -100,6 +101,7 @@ class DistributedStream extends stream.Duplex {
         const count = this.loadBalancer.getTaskSize(client);
 
         this.dataHandler.getData(client, count, (_err, data) => {
+            util.debug(this.debug, "Sending data");
             this.server.sendData(client, data);
         });
     }

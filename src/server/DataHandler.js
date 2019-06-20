@@ -1,12 +1,14 @@
 const EventEmitter = require('events'),
     Data = require('./Data.js'),
-    SortedArray = require('../SortedArray.js');
+    SortedArray = require('../SortedArray.js'),
+    util = require('./Utilities.js');
 
 class DataHandler extends EventEmitter {
-    constructor({redundancy}){
+    constructor({debug, redundancy}){
         super();
 
         this.redundancy = redundancy;
+        this.debug = debug;
 
         /**
          * Counters for data pieces that are:
@@ -66,6 +68,8 @@ class DataHandler extends EventEmitter {
 
     handleResult(data, result){
         data.addResult(result);
+
+        util.debug(this.debug, "Received Result");
 
         // if done with processing this piece, move it to the processed buffer
         if(data.doneWithProcessing()){
