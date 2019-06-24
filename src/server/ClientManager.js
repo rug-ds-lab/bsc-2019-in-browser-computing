@@ -1,7 +1,7 @@
 'use strict';
 
 const EventEmitter = require('events'),
-  util = require('./Utilities.js');
+  util = require('../Utilities.js');
 /**
  * This class intends to provide an easy interface for the server to keep
  * track of connected clients.

@@ -1,7 +1,7 @@
 const EventEmitter = require('events'),
     Data = require('./Data.js'),
     SortedArray = require('../SortedArray.js'),
-    util = require('./Utilities.js');
+    util = require('../Utilities.js');
 
 class DataHandler extends EventEmitter {
     constructor({debug, redundancy}){
