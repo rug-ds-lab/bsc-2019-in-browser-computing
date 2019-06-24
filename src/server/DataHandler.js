@@ -11,28 +11,33 @@ class DataHandler extends EventEmitter {
         this.debug = debug;
 
         /**
-         * Counters for data pieces that are:
-         *  - read from the input stream,
-         *  - processed by the workers
-         *  - written to the output stream
+         * Count of data pieces read from the input stream
          */
-        this.counts = {
-            read: 0,
-            processed: 0
-        }
+        this.readCount = 0;
+
+        /**
+         * Count of data pieces totally processed by the workers
+         */
+        this.processedCount = 0;
 
         this.allDataHasBeenRead = false;
 
         /**
-         * Buffers for data pieces that:
-         *  - isn't done with processing yet (but it might be being processed by enough workers atm)
-         *  - are totally processed, but not written to the stream yet. The key is the read order.
-         * 
-         *  Also stores the data/client pair that should be sent the next
-         *  in an object that is {client, data}.
+         * Buffer for all the data not totally processed and writen 
+         * into the stream yet. A Map of order:data
          */
         this.data = new Map();
+
+        /**
+         * Buffer for data pieces which are still waiting for processing.
+         * A Sorted Array of orders. 
+         */
         this.waiting = new SortedArray();
+
+        /**
+         * Buffer for data pieces which are totally processed but not 
+         * yet written into the stream. A Sorted Array of orders. 
+         */
         this.processed = new SortedArray();
     }
 
@@ -41,8 +46,8 @@ class DataHandler extends EventEmitter {
      * @param {any} data 
      */
     addData(data){
-        const order = this.counts.read;
-        this.counts.read++;
+        const order = this.readCount;
+        this.readCount++;
 
         this.data.set(order, new Data({
             data,
@@ -54,11 +59,18 @@ class DataHandler extends EventEmitter {
         this.emit("new-data");
     }
 
+    /**
+     * Should be called when the program is finished with reading data.
+     */
     endOfData(){
         this.allDataHasBeenRead = true;
     }
 
-    // remove the given client's votes and put its data to appropriate buffers
+    /**
+     * Remove the given client's votes from its unprocessed data and 
+     * make this data available again.
+     * @param {Client} client 
+     */
     removeVote(client){
         client.data.forEach((order) => {
             this.data.get(order).removeVoter(client);
@@ -66,6 +78,13 @@ class DataHandler extends EventEmitter {
         this.emit("new-data");
     }
 
+    /**
+     * Should be called when a result si received for a piece of data. Registers the 
+     * result with the data object, and handles the steps if data is totally processed. 
+     * 
+     * @param {Data} data Data object for which the result is to be registered
+     * @param {any} result Result can be anything
+     */
     handleResult(data, result){
         data.addResult(result);
 
@@ -74,7 +93,7 @@ class DataHandler extends EventEmitter {
         // if done with processing this piece, move it to the processed buffer
         if(data.doneWithProcessing()){
             this.processed.add(data.order);
-            this.counts.processed++;
+            this.processedCount++;
             this.waiting.remove(data.order);
             this.emit("processed");
         }
@@ -119,6 +138,13 @@ class DataHandler extends EventEmitter {
         return callback(null, datas);
     }
 
+    /**
+     * If the data with the given order was processed, removes and returns it
+     * from the buffer. If all processing is finished, returns null.
+     * 
+     * @param {Number} order Order of the data
+     * @returns {Data} Processed data or undefined (if that order isn't processed yet). 
+     */
     popProcessed(order){
         // no more data left, put null to the stream to close it
         if(this.isProcessingFinished() && !this.data.size){
@@ -139,8 +165,12 @@ class DataHandler extends EventEmitter {
         return data;
     }
 
+    /**
+     * Processing is finished if all the data has been read from the source,
+     * and all the read data is processed succesfully.
+     */
     isProcessingFinished(){
-        return this.allDataHasBeenRead && this.counts.processed === this.counts.read;
+        return this.allDataHasBeenRead && this.processedCount === this.readCount;
     }
 }
 
