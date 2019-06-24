@@ -2,8 +2,8 @@
 
 const util = require('../Utilities.js');
 
-const UNIT_TIME = 100,
-    LEADER_TIMEOUT_MAX = 5;
+var UNIT_TIME = 100;
+var LEADER_TIMEOUT_MAX = 5;
 
 class Client {
     /**
@@ -12,19 +12,25 @@ class Client {
      * @param {Boolean} [options.debug=false] Debug mode
      * @param {Number} [options.reconnectInterval=5000] The time (in ms) to wait before trying to reconnect to the server.
      * @param {String} options.workFile
+     * @param {Boolean} [options.enableMultiTabs=false] Whether the code should work on multiple tabs if the user
      */
-    constructor({socket, debug, reconnectInterval, workFile}) {
+    constructor({socket, debug, reconnectInterval, workFile, enableMultiTabs}) {
         if(!socket) util.error("Socket has to be provided.");
         this.socket = socket.close();
-        this._configureSocket();
 
         if(!workFile) util.error("The work file has to be provided.");
         this.workFile = workFile;
 
+        this._configureSocket();
+
         this.debug = debug || false; 
         this.reconnectInterval = reconnectInterval || 5000;
+        this.enableMultiTabs = !!enableMultiTabs;
 
-        // Leader election protocol makes sure only tab is working at any given time
+        // leader election protocol is needless if multiple tabs can work simultenously
+        if(this.enableMultiTabs){
+            return this._startWork();
+        }
 
         /** Is this tab currently the leader */
         this.leader = false;
@@ -81,7 +87,7 @@ class Client {
             this.leaderElectionHappening = false;
 
             // in case a leader was selected while waiting for the election
-            if(this.leaderTimeout === 3) return;
+            if(this.leaderTimeout === LEADER_TIMEOUT_MAX) return;
 
             // stop spamming your id
             clearInterval(interval);
