@@ -17,7 +17,6 @@ const calculateDistance = (permutation) => {
 }
 
 self.onmessage = (e) => {
-  console.log(e.data)
   if(e.data.initialData){
     distances = e.data.initialData;
     return;
