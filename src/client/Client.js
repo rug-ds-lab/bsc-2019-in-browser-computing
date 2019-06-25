@@ -2,8 +2,8 @@
 
 const util = require('../Utilities.js');
 
-var UNIT_TIME = 100;
-var LEADER_TIMEOUT_MAX = 5;
+var UNIT_TIME = 50;
+var TIMEOUT = 3;
 
 class Client {
     /**
@@ -32,74 +32,86 @@ class Client {
             return this._startWork();
         }
 
-        /** Is this tab currently the leader */
-        this.leader = false;
         /** ID of this tab */
         this.id = Math.random();
-        /** IDs of all other tabs */
-        this.ids = [];
-        /** Is the tab in election mode currently */
-        this.leaderElectionHappening = false;
-        /** The channel for the leader to broadcast that it exists */
-        this.leaderChannel = new BroadcastChannel('distributedstream-leader');
-        /** The channel for the elections to take place, by tabs broadcasting their ids */
-        this.electionChannel = new BroadcastChannel('distributedstream-election');
-        /** Timeout for a leader broadcase. If 0, an election is declared */
-        this.leaderTimeout = LEADER_TIMEOUT_MAX;
+        /** The channel for the leader and the worker to broadcast that it exists */
+        this.timeoutChannel = new BroadcastChannel('distributedstream-timeout');
+        /** The channel for the candidates to broadcast their ids */
+        this.candidateChannel = new BroadcastChannel('distributedstream-election');
+        
+        /** Timeout for a leader broadcast. If 0, the candidate becomes the leader */
+        this.leaderTimeout = TIMEOUT;
+        /** Timeout for a worker broadcast. If 0, the leader starts working */
+        this.workerTimeout = TIMEOUT;
 
-        // everytime a leader message is received, reset the election ids and the timeout
-        this.leaderChannel.onmessage = () => {
-            this.ids = [];
-            this.leaderTimeout = LEADER_TIMEOUT_MAX;
+        // everytime a broadcast is received -> reset the appropriate timeout
+        this.timeoutChannel.onmessage = ({data}) => {
+            if(data === "leader"){
+                this.leaderTimeout = TIMEOUT;
+            } else if(data === "worker"){
+                this.workerTimeout = TIMEOUT;
+            }
         };
 
-        // receiving an id for an election
-        this.electionChannel.onmessage = ({data}) => {
-            this.ids.push(data);
+        // everytime an id is broadcasted
+        this.candidateChannel.onmessage = ({data}) => {
+            switch(this.status){
+                case "leader":
+                case "candidate":
+                    if(data > this.id){
+                        this._becomeDefeated();
+                    } else {
+                        this.candidateChannel.postMessage(this.id);
+                    }
+                    break;
+                case "defeated":
+                    if(data < this.id){
+                        this._becomeCandidate();
+                    }
+                    break;
+            }
         };
 
-        // loop in which leaders broadcast their existence and the rest waits on a timeout
+        this._becomeCandidate();
+
+        // loop for timeouts and broadcasting against timeouts
         setInterval(() => {
-            if(this.leaderElectionHappening){
-                return;
-            } else if(this.leader){
-                this.leaderChannel.postMessage("leader");
-            } else {
-                if(--this.leaderTimeout){
-                    this._leaderElection();
-                }
+            switch(this.status){
+                case "worker":
+                    this.timeoutChannel.postMessage(this.status);
+                    break;
+                case "leader":
+                    if(--this.workerTimeout === 0){
+                        this._startWork();
+                    }
+                    this.timeoutChannel.postMessage(this.status);
+                    break;
+                case "candidate":
+                    if(--this.leaderTimeout === 0){
+                        this._becomeLeader();
+                    }
+                    break;
+                case "defeated":
+                    if(--this.leaderTimeout === 0){
+                        this._becomeCandidate();
+                    }
             }
         }, 10*UNIT_TIME);
     }
 
-    /**
-     * Manages the process of a leader election
-     */
-    _leaderElection(){
-        this.leaderElectionHappening = true;
-        this.electionChannel.postMessage(this.id);
+    _becomeLeader(){
+        console.log("BECAME LEADER");
+        this.status = "leader";
+    }
 
-        // keep posting the id for the newcomers to make sure everyone has all the ids
-        const interval = setInterval(()=>{this.electionChannel.postMessage(this.id)}, UNIT_TIME);
+    _becomeCandidate(){
+        this.status = "candidate";
+        this.leaderTimeout = TIMEOUT;
+        this.candidateChannel.postMessage(this.id);
+    }
 
-        // wait until all tabs had time to send their ids
-        setTimeout(() => {
-            this.leaderElectionHappening = false;
-
-            // in case a leader was selected while waiting for the election
-            if(this.leaderTimeout === LEADER_TIMEOUT_MAX) return;
-
-            // stop spamming your id
-            clearInterval(interval);
-
-            // check if this one has the highest id
-            const largest = !this.ids.find((val) => val > this.id);
-
-            if(largest){
-                this.leader = true;
-                this._startWork();
-            }
-        }, 20*UNIT_TIME);
+    _becomeDefeated(){
+        this.status = "defeated";
     }
 
     /**
@@ -108,6 +120,7 @@ class Client {
      *   * Start of data flow
      */
     _startWork(){
+        this.status = "worker";
         this.worker = new Worker(this.workFile);
         this.socket.open();
         util.debug(this.debug, "Socket opened");
