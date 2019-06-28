@@ -1,6 +1,6 @@
 const EventEmitter = require('events'),
     Data = require('./Data.js'),
-    SortedArray = require('../SortedArray.js'),
+    RedBlackTree = require('../RedBlackTree.js'),
     util = require('../Utilities.js');
 
 class DataHandler extends EventEmitter {
@@ -32,13 +32,13 @@ class DataHandler extends EventEmitter {
          * Buffer for data pieces which are still waiting for processing.
          * A Sorted Array of orders. 
          */
-        this.waiting = new SortedArray();
+        this.waiting = new RedBlackTree();
 
         /**
          * Buffer for data pieces which are totally processed but not 
          * yet written into the stream. A Sorted Array of orders. 
          */
-        this.processed = new SortedArray();
+        this.processed = new RedBlackTree();
     }
 
     /**
