@@ -1,0 +1,32 @@
+{
+  "name": "distributed-stream-ml",
+  "version": "0.0.1",
+  "description": "Machine learning layer for the distributed Browser computing framework",
+  "scripts": {
+    "build": "webpack --config webpack-client.config.js && webpack --config webpack-server.config.js",
+    "build-client": "webpack --config webpack-client.config.js",
+    "build-server": "webpack --config webpack-server.config.js",
+    "watch-server": "webpack --config webpack-server.config.js --watch"
+  },
+  "author": "Mark Timmerman",
+  "license": "MIT Groningen",
+  "homepage": "https://github.com/rug-ds-lab/bsc-2019-in-browser-computing",
+  "dependencies": {
+    "bintrees": "^1.0.2",
+    "distributed-stream": "file:../bsc-2019-in-browser-computing",
+    "socket.io": "^2.2.0",
+    "socket.io-client": "^2.2.0",
+    "uws": "10.148.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.4.5",
+    "@babel/preset-env": "^7.4.5",
+    "babel-loader": "^8.0.6",
+    "exports-loader": "^0.7.0",
+    "file-loader": "^4.0.0",
+    "html-webpack-plugin": "^3.2.0",
+    "webpack": "^4.32.2",
+    "webpack-cli": "^3.3.2",
+    "worker-loader": "^2.0.0"
+  }
+}
