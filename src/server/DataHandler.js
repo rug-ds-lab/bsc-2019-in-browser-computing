@@ -1,75 +1,100 @@
 const EventEmitter = require('events'),
-    Data = require('./Data.js');
+    Data = require('./Data.js'),
+    RedBlackTree = require('../RedBlackTree.js'),
+    util = require('../Utilities.js');
 
 class DataHandler extends EventEmitter {
-    constructor({equalityFunction, redundancy}){
+    constructor({debug, redundancy}){
         super();
 
-        this.equalityFunction = equalityFunction;
         this.redundancy = redundancy;
+        this.debug = debug;
 
         /**
-         * Counters for data pieces that are:
-         *  - read from the input stream,
-         *  - processed by the workers
-         *  - written to the output stream
+         * Count of data pieces read from the input stream
          */
-        this.counts = {
-            read: 0,
-            processed: 0
-        }
+        this.readCount = 0;
+
+        /**
+         * Count of data pieces totally processed by the workers
+         */
+        this.processedCount = 0;
 
         this.allDataHasBeenRead = false;
 
         /**
-         * Buffers for data pieces that:
-         *  - can be sent to a suitable worker right away.
-         *  - are currently being processed by enough workers.
-         *  - are totally processed, but not written to the stream yet. The key is the read order.
-         * 
-         *  Also stores the data/client pair that should be sent the next
-         *  in an object that is {client, data}.
+         * Buffer for all the data not totally processed and writen 
+         * into the stream yet. A Map of order:data
          */
-        this.dataBuffers = {
-            canBeSent: new Set(),
-            beingProcessed: new Set(),
-            processed: new Map(),
-        }
+        this.data = new Map();
+
+        /**
+         * Buffer for data pieces which are still waiting for processing.
+         * A Sorted Array of orders. 
+         */
+        this.waiting = new RedBlackTree();
+
+        /**
+         * Buffer for data pieces which are totally processed but not 
+         * yet written into the stream. A Sorted Array of orders. 
+         */
+        this.processed = new RedBlackTree();
     }
 
+    /**
+     * Register new data with the Datahandler.
+     * @param {any} data 
+     */
     addData(data){
-        this.dataBuffers.canBeSent.add(new Data({
+        const order = this.readCount;
+        this.readCount++;
+
+        this.data.set(order, new Data({
             data,
-            order: this.counts.read,
-            redundancy: this.redundancy,
-            equalityFunction: this.equalityFunction
+            order,
+            redundancy: this.redundancy
         }));
-        this.counts.read++;
+
+        this.waiting.add(order)
         this.emit("new-data");
     }
 
+    /**
+     * Should be called when the program is finished with reading data.
+     */
     endOfData(){
-        // Put null at the end so that this eventually closes the stream
-        this.dataBuffers.processed.set(this.counts.read, null);
+        this.allDataHasBeenRead = true;
     }
 
-    // remove the given client's votes and put its data to appropriate buffers
+    /**
+     * Remove the given client's votes from its unprocessed data and 
+     * make this data available again.
+     * @param {Client} client 
+     */
     removeVote(client){
-        client.data.forEach((data) => {
-            data.removeVoter(client);
-            this.dataBuffers.beingProcessed.delete(data); 
-            this.dataBuffers.canBeSent.add(data);
+        client.data.forEach((order) => {
+            this.data.get(order).removeVoter(client);
         });
+        this.emit("new-data");
     }
 
+    /**
+     * Should be called when a result si received for a piece of data. Registers the 
+     * result with the data object, and handles the steps if data is totally processed. 
+     * 
+     * @param {Data} data Data object for which the result is to be registered
+     * @param {any} result Result can be anything
+     */
     handleResult(data, result){
         data.addResult(result);
 
+        util.debug(this.debug, "Received Result");
+
         // if done with processing this piece, move it to the processed buffer
         if(data.doneWithProcessing()){
-            this.dataBuffers.beingProcessed.delete(data);
-            this.dataBuffers.processed.set(data.order, data);
-            this.counts.processed++;
+            this.processed.add(data.order);
+            this.processedCount++;
+            this.waiting.remove(data.order);
             this.emit("processed");
         }
     }
@@ -85,36 +110,67 @@ class DataHandler extends EventEmitter {
      * @param {Socket} client See https://socket.io/docs/server-api/#Socket
      * @param {Number} count Upper bound on how many data pieces to send
      * @param {Function} callback Called with (err, data) data being an array 
-     *        of raw data pieces *NOT* Data objects.
+     *        of Data objects.
      */
     getData(client, count, callback){
-        const datas = Array.from(this.dataBuffers.canBeSent.values()).filter((data) => data.canVote(client)).slice(0, count);
+        const datas = [];
 
-        if(datas.length){
-            datas.forEach((data) => {
+        // get data the client can vote for, up to the given count
+        for(let order of this.waiting.generator()){
+            if(datas.length === count){
+                break;
+            }
+
+            const data = this.data.get(order);
+
+            if(data.canVote(client)){
+                client.data.add(order);
+                datas.push(data);
                 data.addVoter(client);
-                client.data.add(data);
-                // if we don't need to send this anymore, do book keeping
-                if(!data.shouldBeSent()){
-                    this.dataBuffers.canBeSent.delete(data);
-                    this.dataBuffers.beingProcessed.add(data);
-                }
-            });
-
-            return callback(null, datas);
+            }
         }
 
-        this.once("new-data", this.getData.bind(this, client, count, callback));
+        // if no data found, wait until new data is registered
+        if(!datas.length){
+            return this.once("new-data", this.getData.bind(this, client, count, callback));
+        }
+
+        return callback(null, datas);
     }
 
-    popProcessed(key){
-        const data = this.dataBuffers.processed.get(key);
-        this.dataBuffers.processed.delete(key);
+    /**
+     * If the data with the given order was processed, removes and returns it
+     * from the buffer. If all processing is finished, returns null.
+     * 
+     * @param {Number} order Order of the data
+     * @returns {Data} Processed data or undefined (if that order isn't processed yet). 
+     */
+    popProcessed(order){
+        // no more data left, put null to the stream to close it
+        if(this.isProcessingFinished() && !this.data.size){
+            return null;
+        }
+
+        // the requested data isn't processed yet
+        if(!this.processed.has(order)){
+            return undefined;
+        }
+
+        const data = this.data.get(order);
+
+        // remove this data piece from everywhere
+        this.data.delete(order);
+        this.processed.remove(order);
+
         return data;
     }
 
+    /**
+     * Processing is finished if all the data has been read from the source,
+     * and all the read data is processed succesfully.
+     */
     isProcessingFinished(){
-        return this.allDataHasBeenRead && this.counts.processed === this.counts.read;
+        return this.allDataHasBeenRead && this.processedCount === this.readCount;
     }
 }
 

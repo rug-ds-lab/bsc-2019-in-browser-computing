@@ -1,17 +1,18 @@
 'use strict';
 
-const EventEmitter = require('events');
-
+const EventEmitter = require('events'),
+  util = require('../Utilities.js');
 /**
  * This class intends to provide an easy interface for the server to keep
  * track of connected clients.
  */
 class ClientManager extends EventEmitter{
 
-  constructor(){
+  constructor({debug}){
     super();
 
     this.clients = new Set();
+    this.debug = debug;
   }
 
   /**
@@ -21,6 +22,7 @@ class ClientManager extends EventEmitter{
    */
   addClient(client){
     client.data = new Set();
+    util.debug(this.debug, "Client Connected");
     this.clients.add(client);
     client.on("disconnect", this.removeClient.bind(this, client));
   }
@@ -32,6 +34,7 @@ class ClientManager extends EventEmitter{
    */
   removeClient(client){
     this.clients.delete(client);
+    util.debug(this.debug, "Client Disconnected");
     this.emit("disconnection", client);
   }
 }
