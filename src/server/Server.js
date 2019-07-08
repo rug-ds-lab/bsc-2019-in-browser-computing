@@ -33,7 +33,7 @@ class Server extends EventEmitter {
 
         client.data.clear();
         this.emit('client-available', client);
-        data.forEach((data, i) => this.emit("result", data, results[i]));
+        data.forEach((data, i) => this.emit("result", data, results[i])); //FIXME: This is very inefficient
     }
 }
 
