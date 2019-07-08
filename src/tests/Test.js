@@ -6,11 +6,12 @@ const { assert, nextInt } = require('../Utilities.js');
 
 const generateRandomClients = (seed=10) => {
     const clients = [];
-    const lastDataCount = nextInt(1, 300);
-    const lastSendTime = nextInt(400, 3 * 60000);
-    const lastResponseTime = lastSendTime + nextInt(400, 3 * 60000);
 
     for (let i = 0; i < seed; i++) {
+        const lastDataCount = nextInt(1, 300);
+        const lastSendTime = nextInt(400, 60000);
+        const lastResponseTime = lastSendTime + nextInt(400, 60000);
+
         clients.push({
             load: {
                 lastDataCount,
@@ -69,9 +70,19 @@ const testLoadBalancerAdaptive = () => {
         type: 'adaptive',
         size: 200,
     });
+    const averageSystemResponseTime = loadBalancer.averageResponseTime();
     
     clients.forEach((client) => {
-        console.log(client);
+        const { lastDataCount, lastSendTime, lastResponseTime } = client.load;
+        const clientAverage = (lastResponseTime - lastSendTime) / lastDataCount;
+        const newDataCount = loadBalancer.getTaskSize(client);
+        // console.log(clientAverage, averageSystemResponseTime, lastDataCount, newDataCount);
+
+        if (clientAverage >= averageSystemResponseTime) {
+            assert(newDataCount <= lastDataCount);
+        } else {
+            assert(newDataCount >= lastDataCount);
+        }
     });
 }
 
