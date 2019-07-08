@@ -8,12 +8,11 @@ class LoadBalancer {
      * @param {ClientManager} 
      * @param {Object} distribution The type of load distribution requested;
      * @param {String} distribution.type The type of load distribution requested;
-     * @param {Number | Optional} distribution.size The type of load distribution requested;
+     * @param {Number} distribution.size The default amount that we want to distribute;
      */
     constructor(clientManager, distribution) {
         this.clientManager = clientManager;
 
-        // this.validateObject(distribution, 'Type is an empty object');
         this.distribution = distribution;
 
         /**
@@ -50,11 +49,9 @@ class LoadBalancer {
 
         const types = {
             single: () => 1,
-            chunk: () => this.distribution.size,
+            chunk,
             adaptive
         };
-
-        // if (!Object.keys(types).includes(distribution.type)) util.error('Invalid Distribution Type', from);
 
         this.types = types;
     }
@@ -66,7 +63,7 @@ class LoadBalancer {
     averageResponseTime() {
         let count = 0;
         let totalAverage = 0;
-
+        
         this.clientManager.clients.forEach(client => {
             if(!client.load.lastResponseTime){
                 return;
@@ -85,7 +82,13 @@ class LoadBalancer {
      * @returns {Number} Number of tasks to send ideally
      */
     getTaskSize(client) {
-        return this.types[this.distribution.type](client);
+        const distributionFunction = this.types[this.distribution.type];
+
+        if (this.distribution.type !== 'adaptive') {
+            return distributionFunction();
+        }
+
+        return distributionFunction(client);
     }
 
     /**
