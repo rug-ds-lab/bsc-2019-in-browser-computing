@@ -2,6 +2,9 @@
 
 const LoadBalancer = require('../server/LoadBalancer.js');
 const ClientManager = require('../server/ClientManager.js');
+const RedBlackTree = require('../RedBlackTree.js');
+const Data = require('../server/Data.js');
+const DataHandler = require('../server/DataHandler.js');
 const { assert, nextInt } = require('../Utilities.js');
 
 const generateRandomClients = (seed = 10) => {
@@ -104,7 +107,7 @@ const testLoadBalancerAdaptive = () => {
         type: 'adaptive',
         size: 200,
     });
-    // Get System's averagre response time;
+    // Get System's average response time;
     const averageSystemResponseTime = loadBalancer.averageResponseTime();
     
     clients.forEach((client) => {
@@ -124,10 +127,95 @@ const testLoadBalancerAdaptive = () => {
     });
 }
 
+const testRedBlackTree = () =>{
+    const tree = new RedBlackTree();
+    // Add a bunch of items
+    const items = [12,0,1,14,34,234,];
+    items.forEach((item) => {
+        tree.add(item);
+    });
+
+    // the generator iterates through everything
+    // they are all in order
+    let lastItem = -Infinity;
+    let count = 0;
+
+    for(let item of tree.generator()){
+        assert(item >= lastItem);
+        count++;
+    }
+
+    assert(count === items.length);
+
+    // removing removes everything successfully
+    items.forEach((item) => {
+        tree.remove(item);
+    });
+
+    assert(tree._tree.size === 0);
+}
+
+const testData = () => {
+    const data = new Data({data: "data", redundancy: 3, order:1});
+
+    assert(data.shouldBeSent());
+
+    // add voters
+    for(let id=0; id<3; id++){
+        assert(data.shouldBeSent());
+        data.addVoter({id});
+    }
+
+    for(let id=3; id<7; id++){
+        assert(!data.shouldBeSent());
+        data.addVoter({id});
+    }
+
+    // register wrong and correct results 
+    // until correct results have a majority
+    for(let id=0; id<2; id++){
+        assert(!data.shouldBeSent());
+        assert(!data.doneWithProcessing());
+        data.addResult("wrong")
+    }
+
+    for(let id=0; id<5; id++){
+        assert(!data.shouldBeSent());
+        assert(!data.doneWithProcessing());
+        data.addResult("correct")
+    }
+
+    assert(data.doneWithProcessing());
+}
+
+const testDataHandler = () => {
+    const dataHandler = new DataHandler({redundancy:1});
+
+    // run a typical scenerio
+
+    dataHandler.addData("data");
+    assert(dataHandler.readCount === 1);
+    assert(dataHandler.allDataHasBeenRead === false);
+
+    dataHandler.getData({data:new Set(), id:1}, 1, (_err, datas) => {
+        assert(datas.length === 1);
+        assert(datas[0].data === "data");
+        dataHandler.handleResult(datas[0], "result");
+        assert(dataHandler.processedCount === 1);
+        assert(dataHandler.popProcessed(0).data === "data");
+        assert(dataHandler.popProcessed(0) === undefined);
+        dataHandler.endOfData();
+        assert(dataHandler.popProcessed(0) === null);
+    });
+}
+
 const tests = {
     testLoadBalancerSingleChunk,
     testLoadBalancerAdaptive,
     testClientManager,
+    testRedBlackTree,
+    testData,
+    testDataHandler
 };
 Object.keys(tests).forEach((test, i) => {
     try {
