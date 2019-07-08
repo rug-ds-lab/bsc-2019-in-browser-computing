@@ -25,7 +25,7 @@ class Data{
    * even if this function returns false once, it can still return true in the future if 
    * a processing worker returns a faulty result.
    * 
-   * A should be sent if, assuming all current processors return correctly, 
+   * Data should be sent if assuming all current processors return correctly, 
    * majority would still not satisfy the redundancy factor.
    * @returns {Boolean}
    */
@@ -38,7 +38,10 @@ class Data{
    * @returns {Boolean}
    */
   doneWithProcessing(){
-    return (2*this.totalCount - this.majorityCount) >= this.redundancy;
+    const others = this.totalCount - this.majorityCount;
+    const diff = this.majorityCount - others;
+
+    return diff >= this.redundancy;
   }
 
   /**
@@ -89,7 +92,7 @@ class Data{
   addResult(result){
     this.currentProcessorCount--;
 
-    let res = this.results.find((el) => JSON.stringify(el.data) === JSON.stringify(result));
+    const res = this.results.find((el) => JSON.stringify(el.data) === JSON.stringify(result));
     if(res){
       res.count++;
     } else {
