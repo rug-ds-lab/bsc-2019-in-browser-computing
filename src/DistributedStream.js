@@ -48,7 +48,7 @@ class DistributedStream extends stream.Duplex {
         this.dataHandler = new DataHandler({debug, redundancy})
             .on("processed", this._putIntoStream.bind(this));
 
-        this.clientManager = new ClientManager(debug)
+        this.clientManager = new ClientManager({ debug, testing: false })
             .on("disconnection", this.dataHandler.removeVote.bind(this.dataHandler));
 
         this.loadBalancer = new LoadBalancer(this.clientManager, distribution);

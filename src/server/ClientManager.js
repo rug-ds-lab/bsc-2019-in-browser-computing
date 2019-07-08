@@ -8,11 +8,12 @@ const EventEmitter = require('events'),
  */
 class ClientManager extends EventEmitter{
 
-  constructor({ debug }){
+  constructor({ debug, testing }){
     super();
 
     this.clients = new Set();
     this.debug = debug;
+    this.testing = testing;
   }
 
   /**
@@ -24,7 +25,9 @@ class ClientManager extends EventEmitter{
     client.data = new Set();
     util.debug(this.debug, "Client Connected");
     this.clients.add(client);
-    client.on("disconnect", this.removeClient.bind(this, client));
+    if (!this.testing) {
+        client.on("disconnect", this.removeClient.bind(this, client));
+    }
   }
 
   /**
@@ -35,7 +38,9 @@ class ClientManager extends EventEmitter{
   removeClient(client){
     this.clients.delete(client);
     util.debug(this.debug, "Client Disconnected");
-    this.emit("disconnection", client);
+    if (!this.testing) {
+        this.emit("disconnection", client);
+    }
   }
 }
 
