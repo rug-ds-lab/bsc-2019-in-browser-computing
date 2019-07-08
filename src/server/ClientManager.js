@@ -8,7 +8,7 @@ const EventEmitter = require('events'),
  */
 class ClientManager extends EventEmitter{
 
-  constructor({debug}){
+  constructor({ debug }){
     super();
 
     this.clients = new Set();

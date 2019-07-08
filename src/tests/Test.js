@@ -1,19 +1,23 @@
 'use strict';
 
 const LoadBalancer = require('../server/LoadBalancer.js');
+const ClientManager = require('../server/ClientManager.js');
 const { assert, nextInt } = require('../Utilities.js');
 
 const generateRandomClients = (seed=10) => {
-    const types = ['single', 'chunk', 'adjustable'];
-    const clients = {};
-    const loadType = types[nextInt(0, 3)];
-    for(let i = 0; i < seed; i++) {
-        clients[i] = {
-            load: nextInt(1, 300),
-            loadType,
-            responseTime: nextInt(400, 3 * 60000),
-            rating: 0,
-        };
+    const clients = [];
+    const lastDataCount = nextInt(1, 300);
+    const lastSendTime = nextInt(400, 3 * 60000);
+    const lastResponseTime = lastSendTime + nextInt(400, 3 * 60000);
+
+    for (let i = 0; i < seed; i++) {
+        clients.push({
+            load: {
+                lastDataCount,
+                lastSendTime,
+                lastResponseTime,
+            },
+        });
     }
 
     return clients;
@@ -57,17 +61,18 @@ const testLoadBalancerSingleChunk = () => {
 }
 
 const testLoadBalancerAdaptive = () => {
-    // const clients = generateRandomClients();
-    // const steps = [];
-    // for(let i = 0; i < 10000; i++) steps.push(i);
-
-    // const loadBalancer = new LoadBalancer(clients, {
-    //     type: 'adaptive',
-    // }, steps);
-
-    // Object.keys(clients).forEach((id) => {
-    //     loadBalancer.getDistributionTask(id);
-    // });
+    const clients = generateRandomClients();
+    const simulatedClientManager = {
+        clients,
+    };
+    const loadBalancer = new LoadBalancer(simulatedClientManager, {
+        type: 'adaptive',
+        size: 200,
+    });
+    
+    clients.forEach((client) => {
+        console.log(client);
+    });
 }
 
 const tests = {

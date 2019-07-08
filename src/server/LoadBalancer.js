@@ -63,7 +63,7 @@ class LoadBalancer {
     averageResponseTime() {
         let count = 0;
         let totalAverage = 0;
-
+        
         this.clientManager.clients.forEach(client => {
             if(!client.load.lastResponseTime){
                 return;
