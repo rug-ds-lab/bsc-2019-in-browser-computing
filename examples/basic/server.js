@@ -21,6 +21,6 @@ const numberStream = es.readable(function(i, callback)  {
   return callback(null, i.toString());
 });
 
-const distributedStream = new DistributedStream({redundancy:2, socket: socketio(httpServer)});
+const distributedStream = new DistributedStream({socket: socketio(httpServer)});
 
 numberStream.pipe(distributedStream).pipe(es.stringify()).pipe(process.stdout);
