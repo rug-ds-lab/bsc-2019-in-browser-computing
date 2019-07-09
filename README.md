@@ -3,6 +3,13 @@
 # Distributed In-Browser Computing
 This project was developed as a Bachelor's Thesis by George Argyrousis and Tolga Parlan, students of Computing Science at University of Groningen. It is also distributed as an npm package [IN FUTURE UPDATE]. Distributed In-Browser Computing allows you to distribute large computations to the clients who connect to your website. It is designed as a Node Duplex stream, where you can pipe the tasks in, and pipe the results out. The client code runs the calculations, in a seperate WebWorker thread.
 
+# Running The Example
+There are several examples under the `example` folder. After making sure you have `npm` and `node` installed, clone the repository and simply run the commands:
+* `npm i`
+* `node examples/server.js`
+
+Once the server is running, you can browse to `localhost:3000` on any browser and a simple number factorization algorithm should be running.
+
 ## Getting Started
 The Distributed Computing works on top of Node.js. To run the packed and minified production code, download the files from the `dist/` folder. Alternatively, the back-end code can be downloaded via npm: `npm i --save distributed_stream` [TO BE DONE].
 
